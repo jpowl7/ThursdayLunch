@@ -1,6 +1,10 @@
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
 import { neon } from "@neondatabase/serverless";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 async function migrate() {
   const sql = neon(process.env.DATABASE_URL!);
@@ -14,7 +18,7 @@ async function migrate() {
     .filter((s) => s.length > 0);
 
   for (const statement of statements) {
-    await sql(statement as unknown as TemplateStringsArray);
+    await sql.query(statement);
   }
 
   console.log("Migration complete!");

@@ -8,8 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit",
-    "db:migrate": "node --import tsx/esm src/lib/db/migrate.ts",
-    "db:seed": "node --import tsx/esm src/lib/db/seed.ts"
+    "db:migrate": "npx tsx src/lib/db/migrate.ts",
+    "db:seed": "npx tsx src/lib/db/seed.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
