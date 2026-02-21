@@ -112,12 +112,20 @@ function normalizeTime(val: unknown): string {
   return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : s;
 }
 
+// Normalize DATE columns to "YYYY-MM-DD" format
+function normalizeDate(val: unknown): string {
+  if (!val) return "";
+  const d = val instanceof Date ? val : new Date(String(val));
+  if (isNaN(d.getTime())) return String(val);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Row mappers (snake_case DB columns -> camelCase)
 function mapEvent(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     title: row.title as string,
-    date: String(row.date),
+    date: normalizeDate(row.date),
     earliestTime: normalizeTime(row.earliest_time),
     latestTime: normalizeTime(row.latest_time),
     status: row.status as "open" | "finalized" | "cancelled",

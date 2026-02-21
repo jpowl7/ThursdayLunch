@@ -92,15 +92,20 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
               <h2 className="text-2xl font-bold">Active Event Summary</h2>
               <p className="text-slate-500 text-sm">
                 Managing lunch for{" "}
-                {new Date(snapshot.event.date + "T00:00:00").toLocaleDateString("en-US", {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric",
-                })}
+                {(() => {
+                  const d = new Date(snapshot.event.date.includes("T") ? snapshot.event.date : snapshot.event.date + "T12:00:00");
+                  return isNaN(d.getTime()) ? snapshot.event.date : d.toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric",
+                  });
+                })()}
               </p>
             </div>
 
-            <EventHeader event={snapshot.event} />
+            <div className="mb-2">
+              <EventHeader event={snapshot.event} />
+            </div>
 
             {snapshot.event.status === "finalized" && (
               <FinalizedBanner event={snapshot.event} locations={snapshot.locations} />

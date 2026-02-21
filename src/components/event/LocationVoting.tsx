@@ -10,6 +10,18 @@ interface LocationVotingProps {
   disabled?: boolean;
 }
 
+// Assign a consistent color band and emoji to each card by index
+const cardAccents = [
+  { bg: "bg-orange-100", emoji: "🍕" },
+  { bg: "bg-emerald-100", emoji: "🥗" },
+  { bg: "bg-blue-100", emoji: "🍜" },
+  { bg: "bg-purple-100", emoji: "🌮" },
+  { bg: "bg-amber-100", emoji: "🍔" },
+  { bg: "bg-rose-100", emoji: "🍣" },
+  { bg: "bg-cyan-100", emoji: "🥡" },
+  { bg: "bg-lime-100", emoji: "🥪" },
+];
+
 export function LocationVoting({
   locations,
   responses,
@@ -48,28 +60,33 @@ export function LocationVoting({
         </h3>
         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vote for your picks</span>
       </div>
-      <div className="grid gap-4 grid-cols-2">
-        {sorted.map((loc) => {
+      <div className="grid gap-3 grid-cols-2">
+        {sorted.map((loc, i) => {
           const isSelected = selectedIds.includes(loc.id);
           const count = voteCounts.get(loc.id) || 0;
+          const accent = cardAccents[i % cardAccents.length];
           return (
             <div
               key={loc.id}
               onClick={() => toggleLocation(loc.id)}
               className={`relative group cursor-pointer bg-white rounded-xl overflow-hidden transition-all ${
                 isSelected
-                  ? "border-2 border-orange-500 shadow-md shadow-orange-500/5"
-                  : "border border-slate-100 shadow-sm hover:border-orange-500/50"
+                  ? "border-2 border-orange-500 shadow-md shadow-orange-500/10"
+                  : "border border-slate-100 shadow-sm hover:border-orange-500/50 hover:shadow-md"
               } ${disabled ? "opacity-60 cursor-default" : ""}`}
             >
-              <div className="p-4">
-                <p className="font-bold text-sm mb-1">{loc.name}</p>
+              {/* Colored header band with emoji */}
+              <div className={`${accent.bg} h-20 flex items-center justify-center`}>
+                <span className="text-4xl">{accent.emoji}</span>
+              </div>
+              <div className="p-3">
+                <p className="font-bold text-sm mb-0.5">{loc.name}</p>
                 {loc.address && (
-                  <p className="text-xs text-slate-400 mb-2">{loc.address}</p>
+                  <p className="text-[11px] text-slate-400 mb-2 leading-tight">{loc.address}</p>
                 )}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1">
-                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "text-orange-500 filled" : "text-slate-400"}`}>
+                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-400"}`}>
                       thumb_up
                     </span>
                     <span className={`text-xs font-bold ${isSelected ? "text-slate-600" : "text-slate-400"}`}>

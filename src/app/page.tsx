@@ -142,43 +142,41 @@ export default function HomePage() {
 
   return (
     <div className="flex justify-center min-h-screen">
-      <main className="w-full max-w-[430px] min-h-screen flex flex-col">
-        <header className="pt-12 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
+      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
+        <header className="pt-10 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
           <EventHeader event={event} />
         </header>
 
-        <div className="flex-1 overflow-y-auto hide-scrollbar px-6 pb-8">
-          {isFinalized && <div className="mt-6"><FinalizedBanner event={event} locations={locations} /></div>}
+        <div className="px-6 pb-12 pt-6 space-y-8">
+          {isFinalized && <FinalizedBanner event={event} locations={locations} />}
 
-          <div className="space-y-8 mt-6">
-            <AttendeeToggle
-              isIn={isIn}
-              name={name}
-              onToggle={handleToggle}
-              disabled={isFinalized}
+          <AttendeeToggle
+            isIn={isIn}
+            name={name}
+            onToggle={handleToggle}
+            disabled={isFinalized}
+          />
+
+          {isIn && !isFinalized && (
+            <TimeRangeSlider
+              earliestTime={event.earliestTime}
+              latestTime={event.latestTime}
+              availableFrom={availableFrom}
+              availableTo={availableTo}
+              onChange={handleTimeChange}
             />
+          )}
 
-            {isIn && !isFinalized && (
-              <TimeRangeSlider
-                earliestTime={event.earliestTime}
-                latestTime={event.latestTime}
-                availableFrom={availableFrom}
-                availableTo={availableTo}
-                onChange={handleTimeChange}
-              />
-            )}
+          {isIn && !isFinalized && (
+            <LocationVoting
+              locations={locations}
+              responses={responses}
+              selectedIds={locationVotes}
+              onVote={handleVote}
+            />
+          )}
 
-            {isIn && !isFinalized && (
-              <LocationVoting
-                locations={locations}
-                responses={responses}
-                selectedIds={locationVotes}
-                onVote={handleVote}
-              />
-            )}
-
-            <AttendeeList responses={responses} locations={locations} />
-          </div>
+          <AttendeeList responses={responses} locations={locations} />
         </div>
       </main>
     </div>

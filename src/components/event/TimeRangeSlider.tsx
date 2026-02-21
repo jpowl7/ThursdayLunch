@@ -39,6 +39,7 @@ export function TimeRangeSlider({
 }: TimeRangeSliderProps) {
   const minMinutes = timeToMinutes(earliestTime);
   const maxMinutes = timeToMinutes(latestTime);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   const [fromMinutes, setFromMinutes] = useState(
     availableFrom ? timeToMinutes(availableFrom) : minMinutes
@@ -46,55 +47,65 @@ export function TimeRangeSlider({
   const [toMinutes, setToMinutes] = useState(
     availableTo ? timeToMinutes(availableTo) : maxMinutes
   );
-
-  // Track whether user is actively dragging to avoid SSE overwriting
-  const isDragging = useRef(false);
+  const [dragging, setDragging] = useState<"from" | "to" | null>(null);
 
   // Sync with prop changes (e.g., from SSE) when not dragging
   useEffect(() => {
-    if (isDragging.current) return;
+    if (dragging) return;
     const newFrom = availableFrom ? timeToMinutes(availableFrom) : minMinutes;
     const newTo = availableTo ? timeToMinutes(availableTo) : maxMinutes;
     setFromMinutes(newFrom);
     setToMinutes(newTo);
-  }, [availableFrom, availableTo, minMinutes, maxMinutes]);
+  }, [availableFrom, availableTo, minMinutes, maxMinutes, dragging]);
 
-  const handleFromChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = Number(e.target.value);
-      const clamped = Math.min(val, toMinutes - 15);
-      setFromMinutes(clamped);
-      onChange(minutesToTime(clamped), minutesToTime(toMinutes));
+  const pctFromValue = (val: number) =>
+    ((val - minMinutes) / (maxMinutes - minMinutes)) * 100;
+
+  const valueFromClientX = useCallback(
+    (clientX: number) => {
+      if (!trackRef.current) return minMinutes;
+      const rect = trackRef.current.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      const raw = minMinutes + pct * (maxMinutes - minMinutes);
+      return Math.round(raw / 15) * 15; // snap to 15min
     },
-    [toMinutes, onChange]
+    [minMinutes, maxMinutes]
   );
 
-  const handleToChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = Number(e.target.value);
-      const clamped = Math.max(val, fromMinutes + 15);
-      setToMinutes(clamped);
-      onChange(minutesToTime(fromMinutes), minutesToTime(clamped));
+  const handlePointerDown = useCallback(
+    (handle: "from" | "to") => (e: React.PointerEvent) => {
+      if (disabled) return;
+      e.preventDefault();
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      setDragging(handle);
     },
-    [fromMinutes, onChange]
+    [disabled]
   );
 
-  const handlePointerDown = () => {
-    isDragging.current = true;
-  };
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!dragging) return;
+      const val = valueFromClientX(e.clientX);
+      if (dragging === "from") {
+        const clamped = Math.min(val, toMinutes - 15);
+        setFromMinutes(Math.max(minMinutes, clamped));
+      } else {
+        const clamped = Math.max(val, fromMinutes + 15);
+        setToMinutes(Math.min(maxMinutes, clamped));
+      }
+    },
+    [dragging, valueFromClientX, fromMinutes, toMinutes, minMinutes, maxMinutes]
+  );
 
-  const handlePointerUp = () => {
-    isDragging.current = false;
-  };
+  const handlePointerUp = useCallback(() => {
+    if (dragging) {
+      onChange(minutesToTime(fromMinutes), minutesToTime(toMinutes));
+      setDragging(null);
+    }
+  }, [dragging, fromMinutes, toMinutes, onChange]);
 
-  const rangePercent = {
-    left: ((fromMinutes - minMinutes) / (maxMinutes - minMinutes)) * 100,
-    width: ((toMinutes - fromMinutes) / (maxMinutes - minMinutes)) * 100,
-  };
-
-  // Determine which slider should be on top based on thumb positions
-  const midpoint = (minMinutes + maxMinutes) / 2;
-  const fromOnTop = fromMinutes > midpoint;
+  const leftPct = pctFromValue(fromMinutes);
+  const rightPct = 100 - pctFromValue(toMinutes);
 
   return (
     <div className="space-y-3">
@@ -114,40 +125,47 @@ export function TimeRangeSlider({
             <p className="text-orange-500 font-bold text-lg">{formatTime(minutesToTime(toMinutes))}</p>
           </div>
         </div>
-        <div className="relative h-8">
-          <div className="absolute inset-0 top-3 h-2 bg-slate-100 rounded-full" />
+
+        {/* Custom slider track */}
+        <div
+          ref={trackRef}
+          className="relative h-10 flex items-center select-none touch-none"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          {/* Background track */}
+          <div className="absolute left-0 right-0 h-2 bg-slate-100 rounded-full" />
+
+          {/* Active range track */}
           <div
-            className="absolute top-3 h-2 bg-orange-500 rounded-full"
-            style={{ left: `${rangePercent.left}%`, width: `${rangePercent.width}%` }}
+            className="absolute h-2 bg-orange-500 rounded-full"
+            style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
           />
-          <input
-            type="range"
-            min={minMinutes}
-            max={maxMinutes}
-            step={15}
-            value={fromMinutes}
-            onChange={handleFromChange}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            disabled={disabled}
-            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
-            style={{ zIndex: fromOnTop ? 4 : 3 }}
-          />
-          <input
-            type="range"
-            min={minMinutes}
-            max={maxMinutes}
-            step={15}
-            value={toMinutes}
-            onChange={handleToChange}
-            onPointerDown={handlePointerDown}
-            onPointerUp={handlePointerUp}
-            disabled={disabled}
-            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
-            style={{ zIndex: fromOnTop ? 3 : 4 }}
-          />
+
+          {/* From handle */}
+          <div
+            className={`absolute -translate-x-1/2 size-7 bg-white border-2 border-orange-500 rounded-full shadow-lg cursor-pointer flex items-center justify-center transition-shadow ${
+              dragging === "from" ? "shadow-orange-500/30 scale-110" : ""
+            }`}
+            style={{ left: `${leftPct}%` }}
+            onPointerDown={handlePointerDown("from")}
+          >
+            <div className="size-1.5 bg-orange-500 rounded-full" />
+          </div>
+
+          {/* To handle */}
+          <div
+            className={`absolute -translate-x-1/2 size-7 bg-white border-2 border-orange-500 rounded-full shadow-lg cursor-pointer flex items-center justify-center transition-shadow ${
+              dragging === "to" ? "shadow-orange-500/30 scale-110" : ""
+            }`}
+            style={{ left: `${100 - rightPct}%` }}
+            onPointerDown={handlePointerDown("to")}
+          >
+            <div className="size-1.5 bg-orange-500 rounded-full" />
+          </div>
         </div>
-        <p className="text-[11px] text-slate-400 mt-4 text-center">Drag handles to set your lunch window</p>
+
+        <p className="text-[11px] text-slate-400 mt-2 text-center">Drag handles to set your lunch window</p>
       </div>
     </div>
   );
