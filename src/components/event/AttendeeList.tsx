@@ -65,14 +65,21 @@ export function AttendeeList({ responses, locations }: AttendeeListProps) {
               </div>
               {r.locationVotes.length > 0 && (
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {r.locationVotes.map((locId) => (
-                    <span
-                      key={locId}
-                      className="text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full"
-                    >
-                      {locationMap.get(locId) || "Unknown"}
-                    </span>
-                  ))}
+                  {r.locationVotes.map((locId) => {
+                    const isPreferred = r.preferredLocationId === locId;
+                    return (
+                      <span
+                        key={locId}
+                        className={`text-[11px] px-2 py-0.5 rounded-full ${
+                          isPreferred
+                            ? "bg-yellow-100 text-yellow-700 font-semibold"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {isPreferred && "★ "}{locationMap.get(locId) || "Unknown"}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
             </div>

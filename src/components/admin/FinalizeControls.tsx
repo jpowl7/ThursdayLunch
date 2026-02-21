@@ -18,12 +18,16 @@ export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeContr
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
-  // Count votes for display in dropdown
+  // Count votes and preferences for display in dropdown
   const voteCounts = new Map<string, number>();
+  const prefCounts = new Map<string, number>();
   for (const r of responses) {
     if (r.isIn) {
       for (const locId of r.locationVotes) {
         voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
+      }
+      if (r.preferredLocationId) {
+        prefCounts.set(r.preferredLocationId, (prefCounts.get(r.preferredLocationId) || 0) + 1);
       }
     }
   }
@@ -82,11 +86,15 @@ export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeContr
           onChange={(e) => setChosenLocationId(e.target.value)}
           className="w-full bg-white border border-orange-500/20 rounded-full px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none appearance-none text-sm"
         >
-          {sortedLocations.map((loc) => (
-            <option key={loc.id} value={loc.id}>
-              {loc.name} ({voteCounts.get(loc.id) || 0} votes)
-            </option>
-          ))}
+          {sortedLocations.map((loc) => {
+            const votes = voteCounts.get(loc.id) || 0;
+            const prefs = prefCounts.get(loc.id) || 0;
+            return (
+              <option key={loc.id} value={loc.id}>
+                {loc.name} ({votes} votes{prefs > 0 ? `, ${prefs} ★` : ""})
+              </option>
+            );
+          })}
         </select>
       </div>
 

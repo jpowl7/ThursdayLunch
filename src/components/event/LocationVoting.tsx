@@ -7,6 +7,8 @@ interface LocationVotingProps {
   responses: Response[];
   selectedIds: string[];
   onVote: (locationIds: string[]) => void;
+  preferredLocationId?: string | null;
+  onPreference?: (locationId: string | null) => void;
   disabled?: boolean;
 }
 
@@ -27,14 +29,20 @@ export function LocationVoting({
   responses,
   selectedIds,
   onVote,
+  preferredLocationId,
+  onPreference,
   disabled,
 }: LocationVotingProps) {
-  // Count votes per location
+  // Count votes and preferences per location
   const voteCounts = new Map<string, number>();
+  const prefCounts = new Map<string, number>();
   for (const r of responses) {
     if (r.isIn) {
       for (const locId of r.locationVotes) {
         voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
+      }
+      if (r.preferredLocationId) {
+        prefCounts.set(r.preferredLocationId, (prefCounts.get(r.preferredLocationId) || 0) + 1);
       }
     }
   }
@@ -63,7 +71,9 @@ export function LocationVoting({
       <div className="grid gap-3 grid-cols-2">
         {sorted.map((loc, i) => {
           const isSelected = selectedIds.includes(loc.id);
+          const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
+          const prefs = prefCounts.get(loc.id) || 0;
           const accent = cardAccents[i % cardAccents.length];
           return (
             <div
@@ -79,6 +89,22 @@ export function LocationVoting({
               <div className={`${accent.bg} h-20 flex items-center justify-center`}>
                 <span className="text-4xl">{accent.emoji}</span>
               </div>
+              {/* Star button for preference (top-left, only on selected cards) */}
+              {isSelected && onPreference && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreference(isPreferred ? null : loc.id);
+                  }}
+                  className="absolute top-2 left-2 z-10 p-1 rounded-full transition-all"
+                  title={isPreferred ? "Remove top pick" : "Set as top pick"}
+                >
+                  <span className={`material-symbols-outlined text-[20px] ${isPreferred ? "filled text-yellow-500 drop-shadow-sm" : "text-white/70 hover:text-yellow-400"}`}>
+                    star
+                  </span>
+                </button>
+              )}
               <div className="p-3">
                 <p className="font-bold text-sm mb-0.5">{loc.name}</p>
                 {loc.address && (
@@ -91,6 +117,7 @@ export function LocationVoting({
                     </span>
                     <span className={`text-xs font-bold ${isSelected ? "text-slate-600" : "text-slate-400"}`}>
                       {count} {count === 1 ? "vote" : "votes"}
+                      {prefs > 0 && ` · ${prefs} ★`}
                     </span>
                   </div>
                   {loc.mapsUrl && (

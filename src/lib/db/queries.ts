@@ -64,18 +64,19 @@ export async function createEvent(
 export async function upsertResponse(
   eventId: string,
   participantKey: string,
-  input: { name: string; isIn: boolean; availableFrom: string | null; availableTo: string | null; locationVotes: string[] }
+  input: { name: string; isIn: boolean; availableFrom: string | null; availableTo: string | null; locationVotes: string[]; preferredLocationId: string | null }
 ) {
   const sql = getDb();
 
   const rows = await sql`
-    INSERT INTO responses (event_id, participant_key, name, is_in, available_from, available_to)
-    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.isIn}, ${input.availableFrom}, ${input.availableTo})
+    INSERT INTO responses (event_id, participant_key, name, is_in, available_from, available_to, preferred_location_id)
+    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.isIn}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
     ON CONFLICT (event_id, participant_key) DO UPDATE SET
       name = ${input.name},
       is_in = ${input.isIn},
       available_from = ${input.availableFrom},
       available_to = ${input.availableTo},
+      preferred_location_id = ${input.preferredLocationId},
       updated_at = now()
     RETURNING *
   `;
@@ -169,6 +170,7 @@ function mapResponse(row: Record<string, unknown>) {
     availableFrom: row.available_from ? normalizeTime(row.available_from) : null,
     availableTo: row.available_to ? normalizeTime(row.available_to) : null,
     locationVotes: votes,
+    preferredLocationId: row.preferred_location_id ? String(row.preferred_location_id) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

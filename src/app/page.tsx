@@ -40,6 +40,7 @@ export default function HomePage() {
   const [availableFrom, setAvailableFrom] = useState<string | null>(null);
   const [availableTo, setAvailableTo] = useState<string | null>(null);
   const [locationVotes, setLocationVotes] = useState<string[]>([]);
+  const [preferredLocationId, setPreferredLocationId] = useState<string | null>(null);
 
   // Sync local state with server response (only when data actually changes)
   const lastSyncedId = useRef<string | null>(null);
@@ -58,6 +59,7 @@ export default function HomePage() {
     setAvailableFrom(myResponse.availableFrom);
     setAvailableTo(myResponse.availableTo);
     setLocationVotes(myResponse.locationVotes);
+    setPreferredLocationId(myResponse.preferredLocationId);
   }, [myResponse]);
 
   const submitResponse = useCallback(
@@ -67,6 +69,7 @@ export default function HomePage() {
       availableFrom: string | null;
       availableTo: string | null;
       locationVotes: string[];
+      preferredLocationId: string | null;
     }) => {
       if (!snapshot?.event || !participantKey) return;
       try {
@@ -100,18 +103,29 @@ export default function HomePage() {
       availableFrom: newIsIn ? from : availableFrom,
       availableTo: newIsIn ? to : availableTo,
       locationVotes,
+      preferredLocationId,
     });
   };
 
   const handleTimeChange = (from: string, to: string) => {
     setAvailableFrom(from);
     setAvailableTo(to);
-    submitResponse({ isIn, name, availableFrom: from, availableTo: to, locationVotes });
+    submitResponse({ isIn, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId });
   };
 
   const handleVote = (newVotes: string[]) => {
+    // Auto-clear preference if the preferred location is being un-voted
+    const newPreferred = preferredLocationId && newVotes.includes(preferredLocationId)
+      ? preferredLocationId
+      : null;
     setLocationVotes(newVotes);
-    submitResponse({ isIn, name, availableFrom, availableTo, locationVotes: newVotes });
+    setPreferredLocationId(newPreferred);
+    submitResponse({ isIn, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred });
+  };
+
+  const handlePreference = (locationId: string | null) => {
+    setPreferredLocationId(locationId);
+    submitResponse({ isIn, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId });
   };
 
   if (loading) {
@@ -173,6 +187,8 @@ export default function HomePage() {
               responses={responses}
               selectedIds={locationVotes}
               onVote={handleVote}
+              preferredLocationId={preferredLocationId}
+              onPreference={handlePreference}
             />
           )}
 

@@ -16,11 +16,15 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
   const { event, responses, locations } = snapshot;
   const inResponses = responses.filter((r) => r.isIn);
 
-  // Vote tally
+  // Vote and preference tally
   const voteCounts = new Map<string, number>();
+  const prefCounts = new Map<string, number>();
   for (const r of inResponses) {
     for (const locId of r.locationVotes) {
       voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
+    }
+    if (r.preferredLocationId) {
+      prefCounts.set(r.preferredLocationId, (prefCounts.get(r.preferredLocationId) || 0) + 1);
     }
   }
 
@@ -99,7 +103,9 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
             <p className="text-slate-500 text-xs">Leading Venue</p>
             <p className="font-bold">
               {topLocation.name}
-              <span className="text-orange-500 font-medium text-sm ml-1">({topVotes} votes)</span>
+              <span className="text-orange-500 font-medium text-sm ml-1">
+                ({topVotes} votes{(prefCounts.get(topLocation.id) || 0) > 0 && `, ${prefCounts.get(topLocation.id)} ★`})
+              </span>
             </p>
           </div>
         </div>
@@ -132,13 +138,16 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
           <div className="space-y-2">
             {sortedLocations.map((loc) => {
               const count = voteCounts.get(loc.id) || 0;
+              const prefs = prefCounts.get(loc.id) || 0;
               const pct = inResponses.length > 0 ? (count / inResponses.length) * 100 : 0;
               return (
                 <div key={loc.id} className="flex items-center gap-3">
                   <div className="flex-1">
                     <div className="flex justify-between text-sm mb-1">
                       <span className="font-medium">{loc.name}</span>
-                      <span className="text-slate-400 text-xs">{count}</span>
+                      <span className="text-slate-400 text-xs">
+                        {count}{prefs > 0 && ` · ${prefs} ★`}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div
