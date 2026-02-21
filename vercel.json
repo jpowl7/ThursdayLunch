@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/events/[id]/stream/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}
