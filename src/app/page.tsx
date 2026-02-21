@@ -9,6 +9,7 @@ import { TimeRangeSlider } from "@/components/event/TimeRangeSlider";
 import { LocationVoting } from "@/components/event/LocationVoting";
 import { AttendeeList } from "@/components/event/AttendeeList";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
+import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import type { EventSnapshot } from "@/types";
 
 export default function HomePage() {
@@ -193,6 +194,10 @@ export default function HomePage() {
           )}
 
           <AttendeeList responses={responses} locations={locations} />
+
+          {responses.length > 0 && (
+            <SummaryPanel snapshot={snapshot} showTimeDistribution={false} />
+          )}
         </div>
       </main>
     </div>

@@ -2,6 +2,7 @@ import type { EventSnapshot } from "@/types";
 
 interface SummaryPanelProps {
   snapshot: EventSnapshot;
+  showTimeDistribution?: boolean;
 }
 
 function formatTime(time: string | null): string {
@@ -12,7 +13,7 @@ function formatTime(time: string | null): string {
   return `${displayH}:${m.toString().padStart(2, "0")} ${period}`;
 }
 
-export function SummaryPanel({ snapshot }: SummaryPanelProps) {
+export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryPanelProps) {
   const { event, responses, locations } = snapshot;
   const inResponses = responses.filter((r) => r.isIn);
 
@@ -111,7 +112,7 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
         </div>
       )}
 
-      {timeSlots.length > 0 && (
+      {showTimeDistribution && timeSlots.length > 0 && (
         <div>
           <p className="text-slate-500 text-xs mb-2">Time Distribution</p>
           <div className="flex items-end gap-1 h-16">
