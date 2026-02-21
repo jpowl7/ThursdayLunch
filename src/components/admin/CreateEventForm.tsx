@@ -17,7 +17,7 @@ interface LocationInput {
 export function CreateEventForm({ token, onCreated }: CreateEventFormProps) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [earliestTime, setEarliestTime] = useState("11:00");
+  const [earliestTime, setEarliestTime] = useState("11:30");
   const [latestTime, setLatestTime] = useState("13:30");
   const [locations, setLocations] = useState<LocationInput[]>([
     { name: "", address: "", mapsUrl: "" },
