@@ -1,7 +1,5 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { Location, Response } from "@/lib/schemas";
 
 interface LocationVotingProps {
@@ -43,44 +41,60 @@ export function LocationVoting({
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold text-lg">Where to eat?</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex justify-between items-end">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
+          Where to eat?
+        </h3>
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vote for your picks</span>
+      </div>
+      <div className="grid gap-4 grid-cols-2">
         {sorted.map((loc) => {
           const isSelected = selectedIds.includes(loc.id);
           const count = voteCounts.get(loc.id) || 0;
           return (
-            <Card
+            <div
               key={loc.id}
               onClick={() => toggleLocation(loc.id)}
-              className={`cursor-pointer transition-all ${
+              className={`relative group cursor-pointer bg-white rounded-xl overflow-hidden transition-all ${
                 isSelected
-                  ? "ring-2 ring-orange-500 bg-orange-50"
-                  : "hover:bg-gray-50"
+                  ? "border-2 border-orange-500 shadow-md shadow-orange-500/5"
+                  : "border border-slate-100 shadow-sm hover:border-orange-500/50"
               } ${disabled ? "opacity-60 cursor-default" : ""}`}
             >
-              <CardContent className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{loc.name}</p>
-                  {loc.address && (
-                    <p className="text-sm text-muted-foreground">{loc.address}</p>
-                  )}
+              <div className="p-4">
+                <p className="font-bold text-sm mb-1">{loc.name}</p>
+                {loc.address && (
+                  <p className="text-xs text-slate-400 mb-2">{loc.address}</p>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "text-orange-500 filled" : "text-slate-400"}`}>
+                      thumb_up
+                    </span>
+                    <span className={`text-xs font-bold ${isSelected ? "text-slate-600" : "text-slate-400"}`}>
+                      {count} {count === 1 ? "vote" : "votes"}
+                    </span>
+                  </div>
                   {loc.mapsUrl && (
                     <a
                       href={loc.mapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-[10px] text-blue-500 hover:underline uppercase tracking-wider font-bold"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      View map
+                      Map
                     </a>
                   )}
                 </div>
-                <Badge variant="secondary" className="text-base px-3 py-1">
-                  {count}
-                </Badge>
-              </CardContent>
-            </Card>
+              </div>
+              {isSelected && (
+                <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full p-1 shadow-sm">
+                  <span className="material-symbols-outlined text-[16px] font-bold">check</span>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

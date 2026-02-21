@@ -117,7 +117,10 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-orange-300 text-[48px] animate-pulse">lunch_dining</span>
+          <p className="text-slate-400 mt-2 font-medium">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -126,8 +129,9 @@ export default function HomePage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <p className="text-2xl font-bold mb-2">No lunch scheduled yet</p>
-          <p className="text-muted-foreground">Check back later!</p>
+          <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
+          <p className="text-2xl font-bold mb-2 text-slate-700">No lunch scheduled yet</p>
+          <p className="text-slate-400">Check back later!</p>
         </div>
       </div>
     );
@@ -137,40 +141,46 @@ export default function HomePage() {
   const isFinalized = event.status === "finalized";
 
   return (
-    <main className="max-w-lg mx-auto px-4 py-6">
-      <EventHeader event={event} />
+    <div className="flex justify-center min-h-screen">
+      <main className="w-full max-w-[430px] min-h-screen flex flex-col">
+        <header className="pt-12 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
+          <EventHeader event={event} />
+        </header>
 
-      {isFinalized && <FinalizedBanner event={event} locations={locations} />}
+        <div className="flex-1 overflow-y-auto hide-scrollbar px-6 pb-8">
+          {isFinalized && <div className="mt-6"><FinalizedBanner event={event} locations={locations} /></div>}
 
-      <div className="space-y-6">
-        <AttendeeToggle
-          isIn={isIn}
-          name={name}
-          onToggle={handleToggle}
-          disabled={isFinalized}
-        />
+          <div className="space-y-8 mt-6">
+            <AttendeeToggle
+              isIn={isIn}
+              name={name}
+              onToggle={handleToggle}
+              disabled={isFinalized}
+            />
 
-        {isIn && !isFinalized && (
-          <TimeRangeSlider
-            earliestTime={event.earliestTime}
-            latestTime={event.latestTime}
-            availableFrom={availableFrom}
-            availableTo={availableTo}
-            onChange={handleTimeChange}
-          />
-        )}
+            {isIn && !isFinalized && (
+              <TimeRangeSlider
+                earliestTime={event.earliestTime}
+                latestTime={event.latestTime}
+                availableFrom={availableFrom}
+                availableTo={availableTo}
+                onChange={handleTimeChange}
+              />
+            )}
 
-        {isIn && !isFinalized && (
-          <LocationVoting
-            locations={locations}
-            responses={responses}
-            selectedIds={locationVotes}
-            onVote={handleVote}
-          />
-        )}
+            {isIn && !isFinalized && (
+              <LocationVoting
+                locations={locations}
+                responses={responses}
+                selectedIds={locationVotes}
+                onVote={handleVote}
+              />
+            )}
 
-        <AttendeeList responses={responses} locations={locations} />
-      </div>
-    </main>
+            <AttendeeList responses={responses} locations={locations} />
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }

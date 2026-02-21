@@ -53,7 +53,10 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
   if (!authorized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Unauthorized. Add ?token=YOUR_TOKEN to the URL.</p>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-slate-300 text-[48px]">lock</span>
+          <p className="text-slate-400 mt-2">Unauthorized. Add ?token=YOUR_TOKEN to the URL.</p>
+        </div>
       </div>
     );
   }
@@ -61,45 +64,69 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <p className="text-muted-foreground">Loading...</p>
+        <div className="text-center">
+          <span className="material-symbols-outlined text-orange-300 text-[48px] animate-pulse">lunch_dining</span>
+          <p className="text-slate-400 mt-2 font-medium">Loading...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
-
-      {!snapshot ? (
-        <CreateEventForm token={token!} onCreated={fetchData} />
-      ) : (
-        <div className="space-y-6">
-          <EventHeader event={snapshot.event} />
-
-          {snapshot.event.status === "finalized" && (
-            <FinalizedBanner event={snapshot.event} locations={snapshot.locations} />
-          )}
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <SummaryPanel snapshot={snapshot} />
-            {snapshot.event.status === "open" && (
-              <FinalizeControls
-                snapshot={snapshot}
-                token={token!}
-                onFinalized={fetchData}
-              />
-            )}
-          </div>
-
-          <AttendeeList responses={snapshot.responses} locations={snapshot.locations} />
-
-          {snapshot.event.status !== "open" && (
-            <div className="pt-4">
-              <CreateEventForm token={token!} onCreated={fetchData} />
-            </div>
-          )}
+    <>
+      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
+          <h1 className="text-lg font-bold tracking-tight">Thursday Lunch Admin</h1>
         </div>
-      )}
-    </main>
+      </header>
+
+      <main className="max-w-3xl mx-auto p-4 space-y-6 pb-12">
+        {!snapshot ? (
+          <div className="pt-2">
+            <CreateEventForm token={token!} onCreated={fetchData} />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1 pt-2">
+              <h2 className="text-2xl font-bold">Active Event Summary</h2>
+              <p className="text-slate-500 text-sm">
+                Managing lunch for{" "}
+                {new Date(snapshot.event.date + "T00:00:00").toLocaleDateString("en-US", {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric",
+                })}
+              </p>
+            </div>
+
+            <EventHeader event={snapshot.event} />
+
+            {snapshot.event.status === "finalized" && (
+              <FinalizedBanner event={snapshot.event} locations={snapshot.locations} />
+            )}
+
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+              <SummaryPanel snapshot={snapshot} />
+              {snapshot.event.status === "open" && (
+                <FinalizeControls
+                  snapshot={snapshot}
+                  token={token!}
+                  onFinalized={fetchData}
+                />
+              )}
+            </div>
+
+            <AttendeeList responses={snapshot.responses} locations={snapshot.locations} />
+
+            {snapshot.event.status !== "open" && (
+              <div className="pt-4">
+                <CreateEventForm token={token!} onCreated={fetchData} />
+              </div>
+            )}
+          </>
+        )}
+      </main>
+    </>
   );
 }

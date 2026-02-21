@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import type { Response, Location } from "@/lib/schemas";
 
 interface AttendeeListProps {
@@ -30,55 +29,81 @@ export function AttendeeList({ responses, locations }: AttendeeListProps) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold text-lg">
-        Who&apos;s coming? ({inResponses.length})
-      </h3>
-      <div className="space-y-2">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-bold flex items-center gap-2">
+          <span className="material-symbols-outlined text-orange-500">groups</span>
+          Who&apos;s coming?
+        </h3>
+        {inResponses.length > 0 && (
+          <span className="text-xs font-bold text-orange-500 px-2 py-0.5 bg-orange-500/10 rounded-full">
+            {inResponses.length} {inResponses.length === 1 ? "person" : "people"}
+          </span>
+        )}
+      </div>
+      <div className="space-y-3">
         {inResponses.map((r) => (
           <div
             key={r.id}
-            className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-100"
+            className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-50 shadow-sm"
           >
-            <div className="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center text-sm font-bold text-green-800">
-              {getInitials(r.name)}
+            <div className="relative">
+              <div className="size-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-700 border-2 border-white shadow-sm">
+                {getInitials(r.name)}
+              </div>
+              <div className="absolute -bottom-1 -right-1 size-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                <span className="material-symbols-outlined text-white text-[12px] font-bold">check</span>
+              </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{r.name}</p>
-              <div className="flex flex-wrap gap-1 mt-1">
+              <div className="flex justify-between items-start">
+                <p className="font-bold text-sm truncate">{r.name}</p>
                 {r.availableFrom && r.availableTo && (
-                  <Badge variant="outline" className="text-xs">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter whitespace-nowrap ml-2">
                     {formatTime(r.availableFrom)} - {formatTime(r.availableTo)}
-                  </Badge>
+                  </span>
                 )}
-                {r.locationVotes.map((locId) => (
-                  <Badge key={locId} variant="secondary" className="text-xs">
-                    {locationMap.get(locId) || "Unknown"}
-                  </Badge>
-                ))}
               </div>
+              {r.locationVotes.length > 0 && (
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {r.locationVotes.map((locId) => (
+                    <span
+                      key={locId}
+                      className="text-[11px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full"
+                    >
+                      {locationMap.get(locId) || "Unknown"}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
         {outResponses.length > 0 && (
           <>
-            <p className="text-sm text-muted-foreground mt-4">Not coming:</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 px-1">Not coming</p>
             {outResponses.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 border border-gray-100 opacity-60"
+                className="flex items-center gap-4 bg-white/60 p-3 rounded-xl border border-slate-50 opacity-60"
               >
-                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-sm font-bold text-gray-500">
-                  {getInitials(r.name)}
+                <div className="relative">
+                  <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-400 border-2 border-white shadow-sm">
+                    {getInitials(r.name)}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 size-5 bg-red-400 rounded-full border-2 border-white flex items-center justify-center">
+                    <span className="material-symbols-outlined text-white text-[12px] font-bold">close</span>
+                  </div>
                 </div>
-                <p className="font-medium text-gray-500">{r.name}</p>
+                <p className="font-medium text-sm text-slate-400">{r.name}</p>
               </div>
             ))}
           </>
         )}
         {responses.length === 0 && (
-          <p className="text-muted-foreground text-center py-4">
-            No responses yet. Be the first!
-          </p>
+          <div className="text-center py-8">
+            <span className="material-symbols-outlined text-slate-300 text-[48px] mb-2">group_add</span>
+            <p className="text-slate-400 font-medium">No responses yet. Be the first!</p>
+          </div>
         )}
       </div>
     </div>

@@ -1,5 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import type { EventSnapshot } from "@/types";
 
 interface SummaryPanelProps {
@@ -30,6 +28,9 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
   );
 
+  const topLocation = sortedLocations[0];
+  const topVotes = topLocation ? voteCounts.get(topLocation.id) || 0 : 0;
+
   // Time overlap
   const timeSlots: { time: string; count: number }[] = [];
   if (inResponses.length > 0) {
@@ -55,52 +56,103 @@ export function SummaryPanel({ snapshot }: SummaryPanelProps) {
     }
   }
 
+  // Find peak overlap time range
+  const maxOverlap = Math.max(...timeSlots.map((s) => s.count), 0);
+  const peakSlots = timeSlots.filter((s) => s.count === maxOverlap && maxOverlap > 0);
+  const peakStart = peakSlots.length > 0 ? peakSlots[0].time : null;
+  const peakEnd = peakSlots.length > 0 ? peakSlots[peakSlots.length - 1].time : null;
+
   const maxCount = Math.max(...timeSlots.map((s) => s.count), 1);
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-6">
+    <div className="bg-white rounded-xl p-6 border border-orange-500/10 shadow-sm space-y-6">
+      <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
+
+      <div className="flex items-center justify-between">
         <div>
-          <h3 className="font-semibold text-lg mb-2">Headcount</h3>
-          <p className="text-3xl font-bold text-green-600">{inResponses.length}</p>
-          <p className="text-sm text-muted-foreground">
-            {responses.length} total responses
-          </p>
+          <p className="text-slate-500 text-xs">Total RSVPs</p>
+          <p className="text-3xl font-bold">{responses.length}</p>
         </div>
+        <div className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
+          {inResponses.length} going
+        </div>
+      </div>
 
-        {timeSlots.length > 0 && (
-          <div>
-            <h3 className="font-semibold text-lg mb-2">Time Overlap</h3>
-            <div className="flex items-end gap-1 h-24">
-              {timeSlots.map((slot) => (
-                <div key={slot.time} className="flex-1 flex flex-col items-center">
-                  <div
-                    className="w-full bg-orange-400 rounded-t min-h-[2px]"
-                    style={{ height: `${(slot.count / maxCount) * 100}%` }}
-                    title={`${formatTime(slot.time)}: ${slot.count} available`}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>{formatTime(event.earliestTime)}</span>
-              <span>{formatTime(event.latestTime)}</span>
-            </div>
+      {peakStart && peakEnd && (
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+            <span className="material-symbols-outlined">schedule</span>
           </div>
-        )}
+          <div>
+            <p className="text-slate-500 text-xs">Peak Overlap</p>
+            <p className="font-bold">{formatTime(peakStart)} — {formatTime(peakEnd)}</p>
+          </div>
+        </div>
+      )}
 
+      {topLocation && (
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+            <span className="material-symbols-outlined">restaurant</span>
+          </div>
+          <div>
+            <p className="text-slate-500 text-xs">Leading Venue</p>
+            <p className="font-bold">
+              {topLocation.name}
+              <span className="text-orange-500 font-medium text-sm ml-1">({topVotes} votes)</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {timeSlots.length > 0 && (
         <div>
-          <h3 className="font-semibold text-lg mb-2">Location Votes</h3>
-          <div className="space-y-2">
-            {sortedLocations.map((loc) => (
-              <div key={loc.id} className="flex items-center justify-between">
-                <span>{loc.name}</span>
-                <Badge variant="secondary">{voteCounts.get(loc.id) || 0}</Badge>
+          <p className="text-slate-500 text-xs mb-2">Time Distribution</p>
+          <div className="flex items-end gap-1 h-16">
+            {timeSlots.map((slot) => (
+              <div key={slot.time} className="flex-1 flex flex-col items-center">
+                <div
+                  className="w-full bg-orange-400 rounded-t min-h-[2px]"
+                  style={{ height: `${(slot.count / maxCount) * 100}%` }}
+                  title={`${formatTime(slot.time)}: ${slot.count} available`}
+                />
               </div>
             ))}
           </div>
+          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+            <span>{formatTime(event.earliestTime)}</span>
+            <span>{formatTime(event.latestTime)}</span>
+          </div>
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      {sortedLocations.length > 0 && (
+        <div>
+          <p className="text-slate-500 text-xs mb-2">All Venues</p>
+          <div className="space-y-2">
+            {sortedLocations.map((loc) => {
+              const count = voteCounts.get(loc.id) || 0;
+              const pct = inResponses.length > 0 ? (count / inResponses.length) * 100 : 0;
+              return (
+                <div key={loc.id} className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="font-medium">{loc.name}</span>
+                      <span className="text-slate-400 text-xs">{count}</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-orange-400 rounded-full transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

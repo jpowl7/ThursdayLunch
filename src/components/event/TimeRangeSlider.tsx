@@ -98,46 +98,56 @@ export function TimeRangeSlider({
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-sm font-medium">
-        <span>Available: {formatTime(minutesToTime(fromMinutes))}</span>
-        <span>to {formatTime(minutesToTime(toMinutes))}</span>
-      </div>
-      <div className="relative h-8">
-        <div className="absolute inset-0 top-3 h-2 bg-gray-200 rounded-full" />
-        <div
-          className="absolute top-3 h-2 bg-orange-400 rounded-full"
-          style={{ left: `${rangePercent.left}%`, width: `${rangePercent.width}%` }}
-        />
-        <input
-          type="range"
-          min={minMinutes}
-          max={maxMinutes}
-          step={15}
-          value={fromMinutes}
-          onChange={handleFromChange}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          disabled={disabled}
-          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
-          style={{ zIndex: fromOnTop ? 4 : 3 }}
-        />
-        <input
-          type="range"
-          min={minMinutes}
-          max={maxMinutes}
-          step={15}
-          value={toMinutes}
-          onChange={handleToChange}
-          onPointerDown={handlePointerDown}
-          onPointerUp={handlePointerUp}
-          disabled={disabled}
-          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
-          style={{ zIndex: fromOnTop ? 3 : 4 }}
-        />
-      </div>
-      <div className="flex justify-between text-xs text-muted-foreground">
-        <span>{formatTime(earliestTime)}</span>
-        <span>{formatTime(latestTime)}</span>
+      <h3 className="text-lg font-bold flex items-center gap-2">
+        <span className="material-symbols-outlined text-orange-500">schedule</span>
+        When can you go?
+      </h3>
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
+        <div className="flex justify-between mb-6">
+          <div className="text-center">
+            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Earliest</p>
+            <p className="text-orange-500 font-bold text-lg">{formatTime(minutesToTime(fromMinutes))}</p>
+          </div>
+          <div className="h-8 w-px bg-slate-100" />
+          <div className="text-center">
+            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Latest</p>
+            <p className="text-orange-500 font-bold text-lg">{formatTime(minutesToTime(toMinutes))}</p>
+          </div>
+        </div>
+        <div className="relative h-8">
+          <div className="absolute inset-0 top-3 h-2 bg-slate-100 rounded-full" />
+          <div
+            className="absolute top-3 h-2 bg-orange-500 rounded-full"
+            style={{ left: `${rangePercent.left}%`, width: `${rangePercent.width}%` }}
+          />
+          <input
+            type="range"
+            min={minMinutes}
+            max={maxMinutes}
+            step={15}
+            value={fromMinutes}
+            onChange={handleFromChange}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            disabled={disabled}
+            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
+            style={{ zIndex: fromOnTop ? 4 : 3 }}
+          />
+          <input
+            type="range"
+            min={minMinutes}
+            max={maxMinutes}
+            step={15}
+            value={toMinutes}
+            onChange={handleToChange}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            disabled={disabled}
+            className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
+            style={{ zIndex: fromOnTop ? 3 : 4 }}
+          />
+        </div>
+        <p className="text-[11px] text-slate-400 mt-4 text-center">Drag handles to set your lunch window</p>
       </div>
     </div>
   );

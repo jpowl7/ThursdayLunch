@@ -27,12 +27,18 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
     if (name) setNameInput(name);
   }, [name]);
 
-  const handleToggle = () => {
-    if (!isIn && !name) {
+  const handleIn = () => {
+    if (isIn) return;
+    if (!name) {
       setShowNameDialog(true);
     } else {
-      onToggle(!isIn, name);
+      onToggle(true, name);
     }
+  };
+
+  const handleOut = () => {
+    if (!isIn) return;
+    onToggle(false, name);
   };
 
   const handleNameSubmit = () => {
@@ -44,19 +50,32 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
 
   return (
     <>
-      <Button
-        onClick={handleToggle}
-        disabled={disabled}
-        size="lg"
-        className={`w-full h-16 text-lg font-semibold transition-colors ${
-          isIn
-            ? "bg-green-600 hover:bg-green-700 text-white"
-            : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-        }`}
-        variant={isIn ? "default" : "secondary"}
-      >
-        {isIn ? "I'm In!" : "I'm Out"}
-      </Button>
+      <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-100 flex gap-2">
+        <button
+          onClick={handleIn}
+          disabled={disabled}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
+            isIn
+              ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+              : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]">restaurant</span>
+          <span>I&apos;m In!</span>
+        </button>
+        <button
+          onClick={handleOut}
+          disabled={disabled}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
+            !isIn
+              ? "bg-slate-200 text-slate-600 shadow-sm"
+              : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+          }`}
+        >
+          <span className="material-symbols-outlined text-[20px]">close</span>
+          <span>I&apos;m Out</span>
+        </button>
+      </div>
 
       <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
         <DialogContent>
@@ -75,7 +94,7 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
                 autoFocus
               />
             </div>
-            <Button onClick={handleNameSubmit} className="w-full" disabled={!nameInput.trim()}>
+            <Button onClick={handleNameSubmit} className="w-full bg-orange-500 hover:bg-orange-600" disabled={!nameInput.trim()}>
               Join
             </Button>
           </div>

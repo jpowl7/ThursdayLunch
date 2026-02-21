@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import type { Event } from "@/lib/schemas";
 
 interface EventHeaderProps {
@@ -6,28 +5,46 @@ interface EventHeaderProps {
 }
 
 export function EventHeader({ event }: EventHeaderProps) {
-  const statusColor =
-    event.status === "open"
-      ? "bg-green-100 text-green-800"
-      : event.status === "finalized"
-        ? "bg-orange-100 text-orange-800"
-        : "bg-gray-100 text-gray-800";
+  const isOpen = event.status === "open";
+  const isFinalized = event.status === "finalized";
 
   return (
-    <div className="flex items-center justify-between mb-6">
-      <div>
-        <h1 className="text-2xl font-bold">{event.title}</h1>
-        <p className="text-muted-foreground mt-1">
-          {new Date(event.date + "T00:00:00").toLocaleDateString("en-US", {
-            weekday: "long",
-            month: "long",
-            day: "numeric",
-          })}
-        </p>
+    <div className="mb-6">
+      <div className="flex justify-between items-center mb-1">
+        <span className="text-orange-500 font-bold text-sm tracking-wider uppercase">
+          Coming up
+        </span>
+        <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full ${
+          isOpen
+            ? "bg-orange-500/10"
+            : isFinalized
+              ? "bg-green-500/10"
+              : "bg-gray-500/10"
+        }`}>
+          {isOpen && (
+            <span className="size-2 bg-orange-500 rounded-full animate-pulse" />
+          )}
+          <span className={`text-xs font-bold uppercase tracking-tight ${
+            isOpen
+              ? "text-orange-500"
+              : isFinalized
+                ? "text-green-600"
+                : "text-gray-500"
+          }`}>
+            {isOpen ? "Open" : isFinalized ? "Finalized" : "Cancelled"}
+          </span>
+        </div>
       </div>
-      <Badge className={statusColor} variant="secondary">
-        {event.status === "open" ? "Open" : event.status === "finalized" ? "Finalized" : "Cancelled"}
-      </Badge>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+        {event.title}
+      </h1>
+      <p className="text-slate-500 text-sm font-medium mt-1">
+        {new Date(event.date + "T00:00:00").toLocaleDateString("en-US", {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        })}
+      </p>
     </div>
   );
 }

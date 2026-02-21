@@ -1,4 +1,3 @@
-import { Card, CardContent } from "@/components/ui/card";
 import type { Event, Location } from "@/lib/schemas";
 
 interface FinalizedBannerProps {
@@ -18,34 +17,32 @@ export function FinalizedBanner({ event, locations }: FinalizedBannerProps) {
   const chosenLocation = locations.find((l) => l.id === event.chosenLocationId);
 
   return (
-    <Card className="bg-orange-50 border-orange-200 mb-6">
-      <CardContent className="p-6 text-center">
-        <p className="text-3xl mb-2">🎉</p>
-        <h2 className="text-xl font-bold text-orange-800">Lunch is on!</h2>
-        <p className="text-lg mt-2">
-          <span className="font-semibold">{formatTime(event.chosenTime)}</span>
-          {chosenLocation && (
-            <>
-              {" "}at{" "}
-              {chosenLocation.mapsUrl ? (
-                <a
-                  href={chosenLocation.mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-blue-600 hover:underline"
-                >
-                  {chosenLocation.name}
-                </a>
-              ) : (
-                <span className="font-semibold">{chosenLocation.name}</span>
-              )}
-            </>
-          )}
-        </p>
-        {chosenLocation?.address && (
-          <p className="text-sm text-muted-foreground mt-1">{chosenLocation.address}</p>
+    <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 text-center mb-6 shadow-sm">
+      <p className="text-3xl mb-2">🎉</p>
+      <h2 className="text-xl font-bold text-orange-800">Lunch is on!</h2>
+      <p className="text-lg mt-2">
+        <span className="font-bold text-orange-600">{formatTime(event.chosenTime)}</span>
+        {chosenLocation && (
+          <>
+            {" "}at{" "}
+            {chosenLocation.mapsUrl ? (
+              <a
+                href={chosenLocation.mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-blue-600 hover:underline"
+              >
+                {chosenLocation.name}
+              </a>
+            ) : (
+              <span className="font-bold">{chosenLocation.name}</span>
+            )}
+          </>
         )}
-      </CardContent>
-    </Card>
+      </p>
+      {chosenLocation?.address && (
+        <p className="text-sm text-slate-500 mt-1">{chosenLocation.address}</p>
+      )}
+    </div>
   );
 }
