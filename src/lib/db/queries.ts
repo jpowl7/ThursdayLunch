@@ -105,16 +105,23 @@ export async function finalizeEvent(id: string, chosenTime: string, chosenLocati
   return rows[0] || null;
 }
 
+// Strip seconds from TIME columns ("11:00:00" -> "11:00")
+function normalizeTime(val: unknown): string {
+  const s = String(val);
+  const parts = s.split(":");
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : s;
+}
+
 // Row mappers (snake_case DB columns -> camelCase)
 function mapEvent(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     title: row.title as string,
     date: String(row.date),
-    earliestTime: String(row.earliest_time),
-    latestTime: String(row.latest_time),
+    earliestTime: normalizeTime(row.earliest_time),
+    latestTime: normalizeTime(row.latest_time),
     status: row.status as "open" | "finalized" | "cancelled",
-    chosenTime: row.chosen_time ? String(row.chosen_time) : null,
+    chosenTime: row.chosen_time ? normalizeTime(row.chosen_time) : null,
     chosenLocationId: row.chosen_location_id ? String(row.chosen_location_id) : null,
     createdAt: String(row.created_at),
   };
@@ -151,8 +158,8 @@ function mapResponse(row: Record<string, unknown>) {
     participantKey: row.participant_key as string,
     name: row.name as string,
     isIn: row.is_in as boolean,
-    availableFrom: row.available_from ? String(row.available_from) : null,
-    availableTo: row.available_to ? String(row.available_to) : null,
+    availableFrom: row.available_from ? normalizeTime(row.available_from) : null,
+    availableTo: row.available_to ? normalizeTime(row.available_to) : null,
     locationVotes: votes,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),

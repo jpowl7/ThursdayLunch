@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 
 interface TimeRangeSliderProps {
   earliestTime: string;
@@ -47,6 +47,18 @@ export function TimeRangeSlider({
     availableTo ? timeToMinutes(availableTo) : maxMinutes
   );
 
+  // Track whether user is actively dragging to avoid SSE overwriting
+  const isDragging = useRef(false);
+
+  // Sync with prop changes (e.g., from SSE) when not dragging
+  useEffect(() => {
+    if (isDragging.current) return;
+    const newFrom = availableFrom ? timeToMinutes(availableFrom) : minMinutes;
+    const newTo = availableTo ? timeToMinutes(availableTo) : maxMinutes;
+    setFromMinutes(newFrom);
+    setToMinutes(newTo);
+  }, [availableFrom, availableTo, minMinutes, maxMinutes]);
+
   const handleFromChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = Number(e.target.value);
@@ -67,10 +79,22 @@ export function TimeRangeSlider({
     [fromMinutes, onChange]
   );
 
+  const handlePointerDown = () => {
+    isDragging.current = true;
+  };
+
+  const handlePointerUp = () => {
+    isDragging.current = false;
+  };
+
   const rangePercent = {
     left: ((fromMinutes - minMinutes) / (maxMinutes - minMinutes)) * 100,
     width: ((toMinutes - fromMinutes) / (maxMinutes - minMinutes)) * 100,
   };
+
+  // Determine which slider should be on top based on thumb positions
+  const midpoint = (minMinutes + maxMinutes) / 2;
+  const fromOnTop = fromMinutes > midpoint;
 
   return (
     <div className="space-y-3">
@@ -91,8 +115,11 @@ export function TimeRangeSlider({
           step={15}
           value={fromMinutes}
           onChange={handleFromChange}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
           disabled={disabled}
-          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
+          style={{ zIndex: fromOnTop ? 4 : 3 }}
         />
         <input
           type="range"
@@ -101,8 +128,11 @@ export function TimeRangeSlider({
           step={15}
           value={toMinutes}
           onChange={handleToChange}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
           disabled={disabled}
-          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer"
+          className="absolute inset-0 w-full appearance-none bg-transparent pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-orange-500 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:relative"
+          style={{ zIndex: fromOnTop ? 3 : 4 }}
         />
       </div>
       <div className="flex justify-between text-xs text-muted-foreground">

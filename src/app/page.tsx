@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useParticipantKey } from "@/hooks/useParticipantKey";
 import { EventHeader } from "@/components/event/EventHeader";
@@ -41,15 +41,23 @@ export default function HomePage() {
   const [availableTo, setAvailableTo] = useState<string | null>(null);
   const [locationVotes, setLocationVotes] = useState<string[]>([]);
 
-  // Sync local state with server response
+  // Sync local state with server response (only when data actually changes)
+  const lastSyncedId = useRef<string | null>(null);
+  const lastSyncedUpdatedAt = useRef<string | null>(null);
   useEffect(() => {
-    if (myResponse) {
-      setIsIn(myResponse.isIn);
-      setName(myResponse.name);
-      setAvailableFrom(myResponse.availableFrom);
-      setAvailableTo(myResponse.availableTo);
-      setLocationVotes(myResponse.locationVotes);
-    }
+    if (!myResponse) return;
+    // Only sync if the response ID or updatedAt changed
+    if (
+      myResponse.id === lastSyncedId.current &&
+      myResponse.updatedAt === lastSyncedUpdatedAt.current
+    ) return;
+    lastSyncedId.current = myResponse.id;
+    lastSyncedUpdatedAt.current = myResponse.updatedAt;
+    setIsIn(myResponse.isIn);
+    setName(myResponse.name);
+    setAvailableFrom(myResponse.availableFrom);
+    setAvailableTo(myResponse.availableTo);
+    setLocationVotes(myResponse.locationVotes);
   }, [myResponse]);
 
   const submitResponse = useCallback(

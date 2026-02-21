@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,11 @@ interface AttendeeToggleProps {
 export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
+
+  // Sync nameInput when name prop changes (e.g., from SSE)
+  useEffect(() => {
+    if (name) setNameInput(name);
+  }, [name]);
 
   const handleToggle = () => {
     if (!isIn && !name) {
