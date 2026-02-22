@@ -32,7 +32,7 @@ export function ShareButton({ event }: ShareButtonProps) {
   return (
     <button
       onClick={handleShare}
-      className="mt-5 p-2 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
+      className="p-1 rounded-lg text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors"
       aria-label="Share event"
     >
       <span className="material-symbols-outlined text-[22px]">share</span>

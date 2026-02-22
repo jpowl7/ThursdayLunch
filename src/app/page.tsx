@@ -186,12 +186,7 @@ export default function HomePage() {
     <div className="flex justify-center min-h-screen">
       <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
         <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex-1 min-w-0">
-              <EventHeader event={event} />
-            </div>
-            <ShareButton event={event} />
-          </div>
+          <EventHeader event={event} shareButton={<ShareButton event={event} />} />
         </header>
 
         <div className="px-6 pb-8 pt-6 space-y-5">
