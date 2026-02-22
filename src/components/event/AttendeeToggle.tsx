@@ -21,6 +21,7 @@ interface AttendeeToggleProps {
 export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
+  const [pendingIsIn, setPendingIsIn] = useState(false);
 
   // Sync nameInput when name prop changes (e.g., from SSE)
   useEffect(() => {
@@ -30,6 +31,7 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
   const handleIn = () => {
     if (isIn) return;
     if (!name) {
+      setPendingIsIn(true);
       setShowNameDialog(true);
     } else {
       onToggle(true, name);
@@ -37,6 +39,11 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
   };
 
   const handleOut = () => {
+    if (!isIn && !name) {
+      setPendingIsIn(false);
+      setShowNameDialog(true);
+      return;
+    }
     if (!isIn) return;
     onToggle(false, name);
   };
@@ -44,7 +51,7 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
   const handleNameSubmit = () => {
     if (nameInput.trim()) {
       setShowNameDialog(false);
-      onToggle(isIn, nameInput.trim());
+      onToggle(pendingIsIn, nameInput.trim());
     }
   };
 

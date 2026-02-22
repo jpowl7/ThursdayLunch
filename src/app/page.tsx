@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useParticipantKey } from "@/hooks/useParticipantKey";
+import { useParticipantName } from "@/hooks/useParticipantName";
 import { useSnapshotNotifications } from "@/hooks/useSnapshotNotifications";
 import { EventHeader } from "@/components/event/EventHeader";
 import { AttendeeToggle } from "@/components/event/AttendeeToggle";
@@ -16,6 +17,7 @@ import type { EventSnapshot } from "@/types";
 
 export default function HomePage() {
   const participantKey = useParticipantKey();
+  const { name: savedName, setName: persistName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,11 +43,18 @@ export default function HomePage() {
   );
 
   const [isIn, setIsIn] = useState(false);
-  const [name, setName] = useState("");
+  const [name, setName] = useState(savedName || "");
   const [availableFrom, setAvailableFrom] = useState<string | null>(null);
   const [availableTo, setAvailableTo] = useState<string | null>(null);
   const [locationVotes, setLocationVotes] = useState<string[]>([]);
   const [preferredLocationId, setPreferredLocationId] = useState<string | null>(null);
+
+  // Initialize name from localStorage once loaded
+  useEffect(() => {
+    if (savedName && !name) {
+      setName(savedName);
+    }
+  }, [savedName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Sync local state with server response (only when data actually changes)
   const lastSyncedId = useRef<string | null>(null);
@@ -61,11 +70,12 @@ export default function HomePage() {
     lastSyncedUpdatedAt.current = myResponse.updatedAt;
     setIsIn(myResponse.isIn);
     setName(myResponse.name);
+    persistName(myResponse.name);
     setAvailableFrom(myResponse.availableFrom);
     setAvailableTo(myResponse.availableTo);
     setLocationVotes(myResponse.locationVotes);
     setPreferredLocationId(myResponse.preferredLocationId);
-  }, [myResponse]);
+  }, [myResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitResponse = useCallback(
     async (updates: {
@@ -96,6 +106,7 @@ export default function HomePage() {
   const handleToggle = (newIsIn: boolean, newName: string) => {
     setIsIn(newIsIn);
     setName(newName);
+    persistName(newName);
     const from = availableFrom || "12:00";
     const to = availableTo || snapshot?.event?.latestTime || "13:30";
     if (newIsIn && !availableFrom) {

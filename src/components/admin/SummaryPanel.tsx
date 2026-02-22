@@ -73,13 +73,17 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
     <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-slate-500 text-xs">Total RSVPs</p>
-          <p className="text-3xl font-bold">{responses.length}</p>
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-green-600 text-[20px]">check_circle</span>
+          <span className="text-2xl font-bold text-green-600">{inResponses.length}</span>
+          <span className="text-sm text-green-600 font-medium">Going</span>
         </div>
-        <div className="bg-green-100 text-green-700 px-2 py-1 rounded-full text-xs font-medium">
-          {inResponses.length} going
+        <span className="text-slate-300">·</span>
+        <div className="flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-red-400 text-[20px]">cancel</span>
+          <span className="text-2xl font-bold text-red-400">{responses.length - inResponses.length}</span>
+          <span className="text-sm text-red-400 font-medium">Out</span>
         </div>
       </div>
 
