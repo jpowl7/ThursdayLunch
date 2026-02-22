@@ -73,7 +73,7 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
     <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
 
-      <div className="flex items-center gap-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           <span className="material-symbols-outlined text-green-600 text-[20px]">sentiment_satisfied</span>
           <span className="text-2xl font-bold text-green-600">{inResponses.length}</span>
