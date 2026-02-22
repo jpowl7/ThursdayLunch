@@ -172,6 +172,10 @@ export default function HomePage() {
             disabled={isFinalized}
           />
 
+          {responses.length > 0 && (
+            <SummaryPanel snapshot={snapshot} showTimeDistribution={false} />
+          )}
+
           {isIn && !isFinalized && (
             <TimeRangeSlider
               earliestTime={event.earliestTime}
@@ -196,10 +200,6 @@ export default function HomePage() {
           )}
 
           <AttendeeList responses={responses} locations={locations} />
-
-          {responses.length > 0 && (
-            <SummaryPanel snapshot={snapshot} showTimeDistribution={false} />
-          )}
         </div>
       </main>
     </div>
