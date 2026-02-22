@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { Location, Response } from "@/lib/schemas";
 
 interface LocationVotingProps {
@@ -10,19 +11,9 @@ interface LocationVotingProps {
   preferredLocationId?: string | null;
   onPreference?: (locationId: string | null) => void;
   disabled?: boolean;
+  eventId?: string;
+  onLocationAdded?: () => void;
 }
-
-// Assign a consistent color band and emoji to each card by index
-const cardAccents = [
-  { bg: "bg-orange-100", emoji: "🍕" },
-  { bg: "bg-emerald-100", emoji: "🥗" },
-  { bg: "bg-blue-100", emoji: "🍜" },
-  { bg: "bg-purple-100", emoji: "🌮" },
-  { bg: "bg-amber-100", emoji: "🍔" },
-  { bg: "bg-rose-100", emoji: "🍣" },
-  { bg: "bg-cyan-100", emoji: "🥡" },
-  { bg: "bg-lime-100", emoji: "🥪" },
-];
 
 export function LocationVoting({
   locations,
@@ -32,7 +23,12 @@ export function LocationVoting({
   preferredLocationId,
   onPreference,
   disabled,
+  eventId,
+  onLocationAdded,
 }: LocationVotingProps) {
+  const [newName, setNewName] = useState("");
+  const [adding, setAdding] = useState(false);
+
   // Count votes and preferences per location
   const voteCounts = new Map<string, number>();
   const prefCounts = new Map<string, number>();
@@ -59,6 +55,27 @@ export function LocationVoting({
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
   );
 
+  const handleAddLocation = async () => {
+    const trimmed = newName.trim();
+    if (!trimmed || !eventId) return;
+    setAdding(true);
+    try {
+      const res = await fetch(`/api/events/${eventId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmed }),
+      });
+      if (res.ok) {
+        setNewName("");
+        onLocationAdded?.();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <div className="space-y-3">
       <div className="flex justify-between items-end">
@@ -68,28 +85,51 @@ export function LocationVoting({
         </h3>
         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vote for your picks</span>
       </div>
-      <div className="grid gap-3 grid-cols-2">
-        {sorted.map((loc, i) => {
+      <div className="space-y-2">
+        {sorted.map((loc) => {
           const isSelected = selectedIds.includes(loc.id);
           const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
           const prefs = prefCounts.get(loc.id) || 0;
-          const accent = cardAccents[i % cardAccents.length];
           return (
             <div
               key={loc.id}
               onClick={() => toggleLocation(loc.id)}
-              className={`relative group cursor-pointer bg-white rounded-xl overflow-hidden transition-all ${
+              className={`relative flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl cursor-pointer transition-all ${
                 isSelected
-                  ? "border-2 border-orange-500 shadow-md shadow-orange-500/10"
-                  : "border border-slate-100 shadow-sm hover:border-orange-500/50 hover:shadow-md"
+                  ? "border-2 border-orange-500 shadow-sm shadow-orange-500/10"
+                  : "border border-slate-100 shadow-sm hover:border-orange-500/50"
               } ${disabled ? "opacity-60 cursor-default" : ""}`}
             >
-              {/* Colored header band with emoji */}
-              <div className={`${accent.bg} h-20 flex items-center justify-center`}>
-                <span className="text-4xl">{accent.emoji}</span>
+              {/* Check / empty circle */}
+              <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                isSelected ? "bg-orange-500 text-white" : "border-2 border-slate-200"
+              }`}>
+                {isSelected && (
+                  <span className="material-symbols-outlined text-[16px] font-bold">check</span>
+                )}
               </div>
-              {/* Star button for preference (top-left, only on selected cards) */}
+
+              {/* Name + address */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm leading-tight truncate">{loc.name}</p>
+                {loc.address && (
+                  <p className="text-[11px] text-slate-400 leading-tight truncate">{loc.address}</p>
+                )}
+              </div>
+
+              {/* Vote count + prefs */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-300"}`}>
+                  thumb_up
+                </span>
+                <span className="text-xs font-bold text-slate-500">
+                  {count}
+                  {prefs > 0 && <span className="text-yellow-500 ml-0.5">· {prefs} ★</span>}
+                </span>
+              </div>
+
+              {/* Star button for preference */}
               {isSelected && onPreference && (
                 <button
                   type="button"
@@ -97,51 +137,53 @@ export function LocationVoting({
                     e.stopPropagation();
                     onPreference(isPreferred ? null : loc.id);
                   }}
-                  className="absolute top-2 left-2 z-10 p-1 rounded-full transition-all"
+                  className="flex-shrink-0 p-0.5 rounded-full transition-all"
                   title={isPreferred ? "Remove top pick" : "Set as top pick"}
                 >
-                  <span className={`material-symbols-outlined text-[20px] ${isPreferred ? "filled text-yellow-500 drop-shadow-sm" : "text-white/70 hover:text-yellow-400"}`}>
+                  <span className={`material-symbols-outlined text-[18px] ${isPreferred ? "filled text-yellow-500" : "text-slate-300 hover:text-yellow-400"}`}>
                     star
                   </span>
                 </button>
               )}
-              <div className="p-3">
-                <p className="font-bold text-sm mb-0.5">{loc.name}</p>
-                {loc.address && (
-                  <p className="text-[11px] text-slate-400 mb-2 leading-tight">{loc.address}</p>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1">
-                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-400"}`}>
-                      thumb_up
-                    </span>
-                    <span className={`text-xs font-bold ${isSelected ? "text-slate-600" : "text-slate-400"}`}>
-                      {count} {count === 1 ? "vote" : "votes"}
-                      {prefs > 0 && ` · ${prefs} ★`}
-                    </span>
-                  </div>
-                  {loc.mapsUrl && (
-                    <a
-                      href={loc.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-blue-500 hover:underline uppercase tracking-wider font-bold"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      Map
-                    </a>
-                  )}
-                </div>
-              </div>
-              {isSelected && (
-                <div className="absolute top-2 right-2 bg-orange-500 text-white rounded-full p-1 shadow-sm">
-                  <span className="material-symbols-outlined text-[16px] font-bold">check</span>
-                </div>
+
+              {/* Map link */}
+              {loc.mapsUrl && (
+                <a
+                  href={loc.mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-[10px] text-blue-500 hover:underline uppercase tracking-wider font-bold"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  Map
+                </a>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Suggest a place */}
+      {eventId && !disabled && (
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddLocation()}
+            placeholder="Suggest a place…"
+            className="flex-1 min-w-0 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+          />
+          <button
+            type="button"
+            onClick={handleAddLocation}
+            disabled={adding || !newName.trim()}
+            className="px-3 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-default transition-colors"
+          >
+            {adding ? "Adding…" : "Add"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

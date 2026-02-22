@@ -95,6 +95,16 @@ export async function upsertResponse(
   return response;
 }
 
+export async function addLocation(eventId: string, name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    INSERT INTO locations (event_id, name)
+    VALUES (${eventId}, ${name})
+    RETURNING *
+  `;
+  return mapLocation(rows[0]);
+}
+
 export async function finalizeEvent(id: string, chosenTime: string, chosenLocationId: string) {
   const sql = getDb();
   const rows = await sql`

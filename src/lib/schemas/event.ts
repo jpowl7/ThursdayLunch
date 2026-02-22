@@ -35,6 +35,10 @@ export const CreateEventSchema = z.object({
   locations: z.array(CreateLocationInput).min(1),
 });
 
+export const AddLocationSchema = z.object({
+  name: z.string().min(1),
+});
+
 export type Event = z.infer<typeof EventSchema>;
 export type CreateEventInput = z.infer<typeof CreateEventSchema>;
 export type Location = z.infer<typeof LocationSchema>;

@@ -29,7 +29,7 @@ export default function HomePage() {
   }, []);
 
   const eventId = initialSnapshot?.event?.id || null;
-  const { snapshot: liveSnapshot } = useEventStream(eventId);
+  const { snapshot: liveSnapshot, refresh } = useEventStream(eventId);
   const snapshot = liveSnapshot || initialSnapshot;
 
   const myResponse = snapshot?.responses?.find(
@@ -190,6 +190,8 @@ export default function HomePage() {
               onVote={handleVote}
               preferredLocationId={preferredLocationId}
               onPreference={handlePreference}
+              eventId={event.id}
+              onLocationAdded={refresh}
             />
           )}
 
