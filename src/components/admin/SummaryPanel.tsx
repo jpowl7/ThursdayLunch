@@ -75,13 +75,13 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
 
       <div className="flex items-center gap-6">
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-green-600 text-[20px]">check_circle</span>
+          <span className="material-symbols-outlined text-green-600 text-[20px]">sentiment_satisfied</span>
           <span className="text-2xl font-bold text-green-600">{inResponses.length}</span>
           <span className="text-sm text-green-600 font-medium">Going</span>
         </div>
         <span className="text-slate-300">·</span>
         <div className="flex items-center gap-1.5">
-          <span className="material-symbols-outlined text-red-400 text-[20px]">cancel</span>
+          <span className="material-symbols-outlined text-red-400 text-[20px]">sentiment_dissatisfied</span>
           <span className="text-2xl font-bold text-red-400">{responses.length - inResponses.length}</span>
           <span className="text-sm text-red-400 font-medium">Out</span>
         </div>
