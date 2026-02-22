@@ -20,6 +20,7 @@ interface AttendeeToggleProps {
 
 export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
   const [pendingIsIn, setPendingIsIn] = useState(false);
 
@@ -45,6 +46,11 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
       return;
     }
     if (!isIn) return;
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmOut = () => {
+    setShowConfirmDialog(false);
     onToggle(false, name);
   };
 
@@ -122,6 +128,30 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
             </div>
             <Button onClick={handleNameSubmit} className="w-full bg-orange-500 hover:bg-orange-600" disabled={!nameInput.trim()}>
               {name ? "Save" : "Join"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Heading out?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-500">Your votes will be cleared if you opt out.</p>
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowConfirmDialog(false)}
+            >
+              Never mind
+            </Button>
+            <Button
+              className="flex-1 bg-slate-700 hover:bg-slate-800"
+              onClick={handleConfirmOut}
+            >
+              I&apos;m out
             </Button>
           </div>
         </DialogContent>

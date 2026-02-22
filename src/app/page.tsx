@@ -5,6 +5,7 @@ import { useEventStream } from "@/hooks/useEventStream";
 import { useParticipantKey } from "@/hooks/useParticipantKey";
 import { useParticipantName } from "@/hooks/useParticipantName";
 import { useSnapshotNotifications } from "@/hooks/useSnapshotNotifications";
+import { toast } from "sonner";
 import { EventHeader } from "@/components/event/EventHeader";
 import { AttendeeToggle } from "@/components/event/AttendeeToggle";
 import { TimeRangeSlider } from "@/components/event/TimeRangeSlider";
@@ -12,6 +13,7 @@ import { LocationVoting } from "@/components/event/LocationVoting";
 import { AttendeeList } from "@/components/event/AttendeeList";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
 import { ConnectionStatus } from "@/components/event/ConnectionStatus";
+import { ShareButton } from "@/components/event/ShareButton";
 import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import type { EventSnapshot } from "@/types";
 
@@ -88,7 +90,7 @@ export default function HomePage() {
     }) => {
       if (!snapshot?.event || !participantKey) return;
       try {
-        await fetch(`/api/events/${snapshot.event.id}/responses`, {
+        const res = await fetch(`/api/events/${snapshot.event.id}/responses`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -96,8 +98,11 @@ export default function HomePage() {
             ...updates,
           }),
         });
+        if (!res.ok) {
+          toast.error("Couldn't save, try again");
+        }
       } catch {
-        // ignore
+        toast.error("Couldn't save, try again");
       }
     },
     [snapshot?.event, participantKey]
@@ -113,13 +118,20 @@ export default function HomePage() {
       setAvailableFrom(from);
       setAvailableTo(to);
     }
+    // Clear votes when opting out
+    const votes = newIsIn ? locationVotes : [];
+    const preferred = newIsIn ? preferredLocationId : null;
+    if (!newIsIn) {
+      setLocationVotes([]);
+      setPreferredLocationId(null);
+    }
     submitResponse({
       isIn: newIsIn,
       name: newName,
       availableFrom: newIsIn ? from : availableFrom,
       availableTo: newIsIn ? to : availableTo,
-      locationVotes,
-      preferredLocationId,
+      locationVotes: votes,
+      preferredLocationId: preferred,
     });
   };
 
@@ -174,7 +186,12 @@ export default function HomePage() {
     <div className="flex justify-center min-h-screen">
       <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
         <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
-          <EventHeader event={event} />
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <EventHeader event={event} />
+            </div>
+            <ShareButton event={event} />
+          </div>
         </header>
 
         <div className="px-6 pb-8 pt-6 space-y-5">

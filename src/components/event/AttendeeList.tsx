@@ -118,9 +118,10 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
           </>
         )}
         {responses.length === 0 && (
-          <div className="text-center py-8">
-            <span className="material-symbols-outlined text-slate-300 text-[48px] mb-2">group_add</span>
-            <p className="text-slate-400 font-medium">No responses yet. Be the first!</p>
+          <div className="text-center py-10">
+            <span className="material-symbols-outlined text-orange-300 text-[56px] mb-3 animate-pulse">restaurant</span>
+            <p className="text-lg font-bold text-slate-600 mb-1">No one&apos;s responded yet</p>
+            <p className="text-sm text-slate-400">Be the first to join — tap <span className="font-semibold text-orange-500">I&apos;m In!</span> above</p>
           </div>
         )}
       </div>

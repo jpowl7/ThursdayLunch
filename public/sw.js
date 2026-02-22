@@ -1,5 +1,5 @@
-const CACHE_NAME = "thursday-lunch-v2";
-const SHELL_URLS = ["/", "/manifest.json"];
+const CACHE_NAME = "thursday-lunch-v3";
+const SHELL_URLS = ["/", "/manifest.json", "/offline.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -39,7 +39,9 @@ self.addEventListener("fetch", (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() =>
+          caches.match(event.request).then((cached) => cached || caches.match("/offline.html"))
+        )
     );
     return;
   }

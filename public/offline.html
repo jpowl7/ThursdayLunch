@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Offline — Thursday Lunch</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f8f7f5;
+      color: #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 2rem;
+      text-align: center;
+    }
+    .container { max-width: 320px; }
+    .icon { font-size: 64px; margin-bottom: 1rem; }
+    h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+    p { color: #94a3b8; line-height: 1.5; margin-bottom: 1.5rem; }
+    button {
+      background: #f97316;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.75rem;
+      font-weight: 600;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:active { opacity: 0.8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're offline</h1>
+    <p>No worries — check back when you have internet and we'll get lunch sorted.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>
