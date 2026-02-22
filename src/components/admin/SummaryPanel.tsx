@@ -70,7 +70,7 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
   const maxCount = Math.max(...timeSlots.map((s) => s.count), 1);
 
   return (
-    <div className="bg-white rounded-xl p-6 border border-orange-500/10 shadow-sm space-y-6">
+    <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
 
       <div className="flex items-center justify-between">
@@ -84,9 +84,9 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
       </div>
 
       {peakStart && peakEnd && (
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
-            <span className="material-symbols-outlined">schedule</span>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+            <span className="material-symbols-outlined text-sm">schedule</span>
           </div>
           <div>
             <p className="text-slate-500 text-xs">Peak Overlap</p>
@@ -95,22 +95,47 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
         </div>
       )}
 
-      {topLocation && (
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
-            <span className="material-symbols-outlined">restaurant</span>
+      {topLocation && topVotes > 0 && (
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+            <span className="material-symbols-outlined text-sm">restaurant</span>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Leading Venue</p>
+            <p className="text-slate-500 text-xs">Most Voted</p>
             <p className="font-bold">
               {topLocation.name}
               <span className="text-orange-500 font-medium text-sm ml-1">
-                ({topVotes} votes{(prefCounts.get(topLocation.id) || 0) > 0 && `, ${prefCounts.get(topLocation.id)} ★`})
+                ({topVotes} {topVotes === 1 ? "vote" : "votes"})
               </span>
             </p>
           </div>
         </div>
       )}
+
+      {(() => {
+        const topStarred = [...locations]
+          .filter((l) => (prefCounts.get(l.id) || 0) > 0)
+          .sort((a, b) => (prefCounts.get(b.id) || 0) - (prefCounts.get(a.id) || 0));
+        const starLead = topStarred[0];
+        const starCount = starLead ? prefCounts.get(starLead.id) || 0 : 0;
+        if (!starLead) return null;
+        return (
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+              <span className="material-symbols-outlined text-sm">star</span>
+            </div>
+            <div>
+              <p className="text-slate-500 text-xs">Most Starred</p>
+              <p className="font-bold">
+                {starLead.name}
+                <span className="text-yellow-600 font-medium text-sm ml-1">
+                  ({starCount} {starCount === 1 ? "star" : "stars"})
+                </span>
+              </p>
+            </div>
+          </div>
+        );
+      })()}
 
       {showTimeDistribution && timeSlots.length > 0 && (
         <div>

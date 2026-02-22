@@ -27,7 +27,7 @@ export function useEventStream(eventId: string | null) {
     if (pollingRef.current) return;
     setConnectionState("polling");
     fetchSnapshot();
-    pollingRef.current = setInterval(fetchSnapshot, 10000);
+    pollingRef.current = setInterval(fetchSnapshot, 2000);
   }, [fetchSnapshot]);
 
   const stopPolling = useCallback(() => {

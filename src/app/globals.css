@@ -122,7 +122,7 @@
   }
   body {
     @apply bg-background text-foreground;
-    font-family: 'Inter', var(--font-geist-sans), sans-serif;
+    font-family: var(--font-inter), var(--font-geist-sans), sans-serif;
     -webkit-tap-highlight-color: transparent;
   }
 }

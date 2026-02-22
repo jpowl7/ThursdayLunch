@@ -44,8 +44,13 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
   const handleNameSubmit = () => {
     if (nameInput.trim()) {
       setShowNameDialog(false);
-      onToggle(true, nameInput.trim());
+      onToggle(isIn, nameInput.trim());
     }
+  };
+
+  const handleEditName = () => {
+    setNameInput(name);
+    setShowNameDialog(true);
   };
 
   return (
@@ -77,10 +82,24 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
         </button>
       </div>
 
+      {name && !disabled && (
+        <div className="flex items-center justify-center gap-1.5 -mt-3">
+          <span className="text-sm text-slate-500">
+            Signed in as <span className="font-semibold text-slate-700">{name}</span>
+          </span>
+          <button
+            onClick={handleEditName}
+            className="text-orange-500 hover:text-orange-600 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[16px]">edit</span>
+          </button>
+        </div>
+      )}
+
       <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>What&apos;s your name?</DialogTitle>
+            <DialogTitle>{name ? "Change your name" : "What\u0027s your name?"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
@@ -95,7 +114,7 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
               />
             </div>
             <Button onClick={handleNameSubmit} className="w-full bg-orange-500 hover:bg-orange-600" disabled={!nameInput.trim()}>
-              Join
+              {name ? "Save" : "Join"}
             </Button>
           </div>
         </DialogContent>

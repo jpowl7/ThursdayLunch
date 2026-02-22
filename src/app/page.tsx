@@ -3,12 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useEventStream } from "@/hooks/useEventStream";
 import { useParticipantKey } from "@/hooks/useParticipantKey";
+import { useSnapshotNotifications } from "@/hooks/useSnapshotNotifications";
 import { EventHeader } from "@/components/event/EventHeader";
 import { AttendeeToggle } from "@/components/event/AttendeeToggle";
 import { TimeRangeSlider } from "@/components/event/TimeRangeSlider";
 import { LocationVoting } from "@/components/event/LocationVoting";
 import { AttendeeList } from "@/components/event/AttendeeList";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
+import { ConnectionStatus } from "@/components/event/ConnectionStatus";
 import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import type { EventSnapshot } from "@/types";
 
@@ -29,8 +31,10 @@ export default function HomePage() {
   }, []);
 
   const eventId = initialSnapshot?.event?.id || null;
-  const { snapshot: liveSnapshot, refresh } = useEventStream(eventId);
+  const { snapshot: liveSnapshot, connectionState, refresh } = useEventStream(eventId);
   const snapshot = liveSnapshot || initialSnapshot;
+
+  useSnapshotNotifications(snapshot, participantKey);
 
   const myResponse = snapshot?.responses?.find(
     (r) => r.participantKey === participantKey
@@ -92,7 +96,7 @@ export default function HomePage() {
   const handleToggle = (newIsIn: boolean, newName: string) => {
     setIsIn(newIsIn);
     setName(newName);
-    const from = availableFrom || snapshot?.event?.earliestTime || "11:00";
+    const from = availableFrom || "12:00";
     const to = availableTo || snapshot?.event?.latestTime || "13:30";
     if (newIsIn && !availableFrom) {
       setAvailableFrom(from);
@@ -158,11 +162,11 @@ export default function HomePage() {
   return (
     <div className="flex justify-center min-h-screen">
       <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
-        <header className="pt-10 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
+        <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
           <EventHeader event={event} />
         </header>
 
-        <div className="px-6 pb-12 pt-6 space-y-8">
+        <div className="px-6 pb-8 pt-6 space-y-5">
           {isFinalized && <FinalizedBanner event={event} locations={locations} />}
 
           <AttendeeToggle
@@ -199,8 +203,9 @@ export default function HomePage() {
             />
           )}
 
-          <AttendeeList responses={responses} locations={locations} />
+          <AttendeeList responses={responses} locations={locations} currentParticipantKey={participantKey} />
         </div>
+        <ConnectionStatus state={connectionState} />
       </main>
     </div>
   );

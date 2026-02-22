@@ -3,6 +3,7 @@ import type { Response, Location } from "@/lib/schemas";
 interface AttendeeListProps {
   responses: Response[];
   locations: Location[];
+  currentParticipantKey?: string | null;
 }
 
 function formatTime(time: string | null): string {
@@ -22,7 +23,7 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function AttendeeList({ responses, locations }: AttendeeListProps) {
+export function AttendeeList({ responses, locations, currentParticipantKey }: AttendeeListProps) {
   const locationMap = new Map(locations.map((l) => [l.id, l.name]));
   const inResponses = responses.filter((r) => r.isIn);
   const outResponses = responses.filter((r) => !r.isIn);
@@ -40,14 +41,20 @@ export function AttendeeList({ responses, locations }: AttendeeListProps) {
           </span>
         )}
       </div>
-      <div className="space-y-3">
-        {inResponses.map((r) => (
+      <div className="space-y-2">
+        {inResponses.map((r) => {
+          const isMe = r.participantKey === currentParticipantKey;
+          return (
           <div
             key={r.id}
-            className="flex items-center gap-4 bg-white p-3 rounded-xl border border-slate-50 shadow-sm"
+            className={`flex items-center gap-4 bg-white p-2.5 rounded-xl shadow-sm ${
+              isMe ? "border-2 border-orange-400 ring-1 ring-orange-400/20" : "border border-slate-50"
+            }`}
           >
             <div className="relative">
-              <div className="size-12 rounded-full bg-orange-100 flex items-center justify-center text-sm font-bold text-orange-700 border-2 border-white shadow-sm">
+              <div className={`size-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white shadow-sm ${
+                isMe ? "bg-orange-200 text-orange-800" : "bg-orange-100 text-orange-700"
+              }`}>
                 {getInitials(r.name)}
               </div>
               <div className="absolute -bottom-1 -right-1 size-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
@@ -56,7 +63,10 @@ export function AttendeeList({ responses, locations }: AttendeeListProps) {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
-                <p className="font-bold text-sm truncate">{r.name}</p>
+                <p className="font-bold text-sm truncate">
+                  {r.name}
+                  {isMe && <span className="text-[10px] text-orange-500 font-bold ml-1.5">(You)</span>}
+                </p>
                 {r.availableFrom && r.availableTo && (
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter whitespace-nowrap ml-2">
                     {formatTime(r.availableFrom)} - {formatTime(r.availableTo)}
@@ -84,17 +94,18 @@ export function AttendeeList({ responses, locations }: AttendeeListProps) {
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
         {outResponses.length > 0 && (
           <>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 px-1">Not coming</p>
             {outResponses.map((r) => (
               <div
                 key={r.id}
-                className="flex items-center gap-4 bg-white/60 p-3 rounded-xl border border-slate-50 opacity-60"
+                className="flex items-center gap-4 bg-white/60 p-2.5 rounded-xl border border-slate-50 opacity-60"
               >
                 <div className="relative">
-                  <div className="size-12 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-400 border-2 border-white shadow-sm">
+                  <div className="size-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-400 border-2 border-white shadow-sm">
                     {getInitials(r.name)}
                   </div>
                   <div className="absolute -bottom-1 -right-1 size-5 bg-red-400 rounded-full border-2 border-white flex items-center justify-center">

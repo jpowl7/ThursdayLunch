@@ -4,17 +4,6 @@ interface EventHeaderProps {
   event: Event;
 }
 
-function formatEventDate(dateStr: string): string {
-  // Handle both "YYYY-MM-DD" and verbose Date.toString() formats
-  const d = new Date(dateStr.includes("T") ? dateStr : dateStr + "T12:00:00");
-  if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-  });
-}
-
 export function EventHeader({ event }: EventHeaderProps) {
   const isOpen = event.status === "open";
   const isFinalized = event.status === "finalized";
@@ -49,9 +38,6 @@ export function EventHeader({ event }: EventHeaderProps) {
       <h1 className="text-3xl font-bold tracking-tight text-slate-900">
         {event.title}
       </h1>
-      <p className="text-slate-500 text-sm font-medium mt-1">
-        {formatEventDate(event.date)}
-      </p>
     </div>
   );
 }
