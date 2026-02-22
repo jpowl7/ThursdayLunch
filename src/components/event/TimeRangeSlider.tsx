@@ -113,38 +113,38 @@ export function TimeRangeSlider({
         <span className="material-symbols-outlined text-orange-500">schedule</span>
         When can you go?
       </h3>
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100">
-        <div className="flex justify-between mb-6">
+      <div className="bg-white rounded-xl px-4 py-3 shadow-sm border border-slate-100">
+        <div className="flex justify-between items-center mb-3">
           <div className="text-center">
-            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Earliest</p>
-            <p className="text-orange-500 font-bold text-lg">{formatTime(minutesToTime(fromMinutes))}</p>
+            <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-widest">Earliest</p>
+            <p className="text-orange-500 font-bold text-sm">{formatTime(minutesToTime(fromMinutes))}</p>
           </div>
-          <div className="h-8 w-px bg-slate-100" />
+          <div className="h-6 w-px bg-slate-100" />
           <div className="text-center">
-            <p className="text-[10px] uppercase font-bold text-slate-400 mb-1 tracking-widest">Latest</p>
-            <p className="text-orange-500 font-bold text-lg">{formatTime(minutesToTime(toMinutes))}</p>
+            <p className="text-[10px] uppercase font-bold text-slate-400 mb-0.5 tracking-widest">Latest</p>
+            <p className="text-orange-500 font-bold text-sm">{formatTime(minutesToTime(toMinutes))}</p>
           </div>
         </div>
 
         {/* Custom slider track */}
         <div
           ref={trackRef}
-          className="relative h-10 flex items-center select-none touch-none"
+          className="relative h-8 flex items-center select-none touch-none"
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
         >
           {/* Background track */}
-          <div className="absolute left-0 right-0 h-2 bg-slate-100 rounded-full" />
+          <div className="absolute left-0 right-0 h-1.5 bg-slate-100 rounded-full" />
 
           {/* Active range track */}
           <div
-            className="absolute h-2 bg-orange-500 rounded-full"
+            className="absolute h-1.5 bg-orange-500 rounded-full"
             style={{ left: `${leftPct}%`, right: `${rightPct}%` }}
           />
 
           {/* From handle */}
           <div
-            className={`absolute -translate-x-1/2 size-7 bg-white border-2 border-orange-500 rounded-full shadow-lg cursor-pointer flex items-center justify-center transition-shadow ${
+            className={`absolute -translate-x-1/2 size-6 bg-white border-2 border-orange-500 rounded-full shadow-md cursor-pointer flex items-center justify-center transition-shadow ${
               dragging === "from" ? "shadow-orange-500/30 scale-110" : ""
             }`}
             style={{ left: `${leftPct}%` }}
@@ -155,7 +155,7 @@ export function TimeRangeSlider({
 
           {/* To handle */}
           <div
-            className={`absolute -translate-x-1/2 size-7 bg-white border-2 border-orange-500 rounded-full shadow-lg cursor-pointer flex items-center justify-center transition-shadow ${
+            className={`absolute -translate-x-1/2 size-6 bg-white border-2 border-orange-500 rounded-full shadow-md cursor-pointer flex items-center justify-center transition-shadow ${
               dragging === "to" ? "shadow-orange-500/30 scale-110" : ""
             }`}
             style={{ left: `${100 - rightPct}%` }}
@@ -164,8 +164,6 @@ export function TimeRangeSlider({
             <div className="size-1.5 bg-orange-500 rounded-full" />
           </div>
         </div>
-
-        <p className="text-[11px] text-slate-400 mt-2 text-center">Drag handles to set your lunch window</p>
       </div>
     </div>
   );
