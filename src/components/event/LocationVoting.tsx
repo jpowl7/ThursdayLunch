@@ -41,6 +41,7 @@ export function LocationVoting({
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
@@ -149,9 +150,20 @@ export function LocationVoting({
         }),
       });
       if (res.ok) {
+        const added = await res.json();
         setNewName("");
         setSelectedPlaceId(null);
         setSuggestions([]);
+        if (added?.id) {
+          setRecentlyAdded((prev) => new Set(prev).add(added.id));
+          setTimeout(() => {
+            setRecentlyAdded((prev) => {
+              const next = new Set(prev);
+              next.delete(added.id);
+              return next;
+            });
+          }, 15000);
+        }
         onLocationAdded?.();
       } else {
         const data = await res.json();
@@ -190,9 +202,12 @@ export function LocationVoting({
       <div className="flex justify-between items-end">
         <h3 className="text-lg font-bold flex items-center gap-2">
           <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
-          Where to eat?
+          Where?
         </h3>
-        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vote for your picks</span>
+        <span className="text-[11px] text-slate-400 flex items-center gap-2">
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span> I like these</span>
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span> preference</span>
+        </span>
       </div>
       <div className="space-y-2">
         {(showAll || sorted.length <= 10 ? sorted : sorted.slice(0, 10)).map((loc) => {
@@ -200,7 +215,7 @@ export function LocationVoting({
           const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
           const prefs = prefCounts.get(loc.id) || 0;
-          const canDelete = loc.addedBy === participantKey;
+          const canDelete = loc.addedBy === participantKey && recentlyAdded.has(loc.id);
           return (
             <div
               key={loc.id}
@@ -243,19 +258,34 @@ export function LocationVoting({
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm leading-tight truncate">{loc.name}</p>
                 {loc.address && (
-                  <p className="text-[11px] text-slate-400 leading-tight truncate">{loc.address}</p>
+                  loc.mapsUrl ? (
+                    <a
+                      href={loc.mapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-blue-500 hover:underline leading-tight truncate block"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {loc.address}
+                    </a>
+                  ) : (
+                    <p className="text-[11px] text-slate-400 leading-tight truncate">{loc.address}</p>
+                  )
                 )}
               </div>
 
               {/* Vote count + prefs */}
-              <div className="flex items-center gap-1 flex-shrink-0">
+              <div className="flex items-center gap-1.5 flex-shrink-0">
                 <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-300"}`}>
                   thumb_up
                 </span>
-                <span className="text-xs font-bold text-slate-500">
-                  {count}
-                  {prefs > 0 && <span className="text-yellow-500 ml-0.5">· {prefs} ★</span>}
-                </span>
+                <span className="text-xs font-bold text-slate-500">{count}</span>
+                {prefs > 0 && (
+                  <>
+                    <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>
+                    <span className="text-xs font-bold text-yellow-500">{prefs}</span>
+                  </>
+                )}
               </div>
 
               {/* Star button for preference */}
@@ -275,18 +305,6 @@ export function LocationVoting({
                 </button>
               )}
 
-              {/* Map link */}
-              {loc.mapsUrl && (
-                <a
-                  href={loc.mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-shrink-0 text-[10px] text-blue-500 hover:underline uppercase tracking-wider font-bold"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  Map
-                </a>
-              )}
 
               {/* Delete button (only for locations you added) */}
               {canDelete && !disabled && (

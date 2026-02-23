@@ -161,11 +161,11 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
         </div>
       )}
 
-      {sortedLocations.length > 0 && (
+      {sortedLocations.some((l) => (voteCounts.get(l.id) || 0) > 0) && (
         <div>
-          <p className="text-slate-500 text-xs mb-2">All Venues</p>
+          <p className="text-slate-500 text-xs mb-2">Location Votes</p>
           <div className="space-y-2">
-            {sortedLocations.map((loc) => {
+            {sortedLocations.filter((loc) => (voteCounts.get(loc.id) || 0) > 0).map((loc) => {
               const count = voteCounts.get(loc.id) || 0;
               const prefs = prefCounts.get(loc.id) || 0;
               const pct = inResponses.length > 0 ? (count / inResponses.length) * 100 : 0;
@@ -174,8 +174,9 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
                   <div className="flex-1">
                     <div className="flex justify-between text-sm mb-1">
                       <span className="font-medium">{loc.name}</span>
-                      <span className="text-slate-400 text-xs">
-                        {count}{prefs > 0 && ` · ${prefs} ★`}
+                      <span className="text-slate-400 text-xs flex items-center gap-0.5">
+                        <span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span>
+                        {count}{prefs > 0 && <>&nbsp;· <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>{prefs}</>}
                       </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">

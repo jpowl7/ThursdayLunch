@@ -83,7 +83,7 @@ export async function getPlaceDetails(
     const data = await res.json();
     return {
       address: data.formattedAddress ?? "",
-      mapsUrl: `https://www.google.com/maps/place/?q=place_id:${placeId}`,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(data.formattedAddress ?? "")}&query_place_id=${placeId}`,
       websiteUrl: data.websiteUri ?? null,
     };
   } catch {
@@ -121,7 +121,7 @@ export async function lookupPlace(
 
     return {
       address: place.formattedAddress ?? "",
-      mapsUrl: `https://www.google.com/maps/place/?q=place_id:${place.id}`,
+      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.formattedAddress ?? "")}&query_place_id=${place.id}`,
     };
   } catch {
     return null;

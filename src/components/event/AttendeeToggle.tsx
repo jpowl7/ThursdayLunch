@@ -68,46 +68,48 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
 
   return (
     <>
-      <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-100 flex gap-2">
-        <button
-          onClick={handleIn}
-          disabled={disabled}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
-            isIn
-              ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
-              : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px]">restaurant</span>
-          <span>I&apos;m In!</span>
-        </button>
-        <button
-          onClick={handleOut}
-          disabled={disabled}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
-            !isIn
-              ? "bg-slate-200 text-slate-600 shadow-sm"
-              : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-          }`}
-        >
-          <span className="material-symbols-outlined text-[20px]">close</span>
-          <span>I&apos;m Out</span>
-        </button>
-      </div>
-
-      {name && !disabled && (
-        <div className="flex items-center justify-center gap-1.5 -mt-3">
-          <span className="text-sm text-slate-500">
-            Signed in as <span className="font-semibold text-slate-700">{name}</span>
-          </span>
+      <div>
+        <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-100 flex gap-2">
           <button
-            onClick={handleEditName}
-            className="text-orange-500 hover:text-orange-600 transition-colors"
+            onClick={handleIn}
+            disabled={disabled}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
+              isIn
+                ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+            }`}
           >
-            <span className="material-symbols-outlined text-[16px]">edit</span>
+            <span className="material-symbols-outlined text-[20px]">restaurant</span>
+            <span>I&apos;m In!</span>
+          </button>
+          <button
+            onClick={handleOut}
+            disabled={disabled}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
+              !isIn
+                ? "bg-slate-200 text-slate-600 shadow-sm"
+                : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+            <span>I&apos;m Out</span>
           </button>
         </div>
-      )}
+
+        {name && !disabled && (
+          <div className="flex items-center justify-center gap-1.5 mt-2 -mb-1">
+            <span className="text-sm text-slate-500">
+              Signed in as <span className="font-semibold text-slate-700">{name}</span>
+            </span>
+            <button
+              onClick={handleEditName}
+              className="text-orange-500 hover:text-orange-600 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">edit</span>
+            </button>
+          </div>
+        )}
+      </div>
 
       <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
         <DialogContent>
