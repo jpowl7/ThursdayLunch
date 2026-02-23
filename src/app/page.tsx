@@ -14,6 +14,8 @@ import { AttendeeList } from "@/components/event/AttendeeList";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
 import { ConnectionStatus } from "@/components/event/ConnectionStatus";
 import { ShareButton } from "@/components/event/ShareButton";
+import { Leaderboard } from "@/components/event/Leaderboard";
+import { PastLunches } from "@/components/event/PastLunches";
 import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import type { EventSnapshot } from "@/types";
 
@@ -169,12 +171,20 @@ export default function HomePage() {
 
   if (!snapshot) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
-          <p className="text-2xl font-bold mb-2 text-slate-700">No lunch scheduled yet</p>
-          <p className="text-slate-400">Check back later!</p>
-        </div>
+      <div className="flex justify-center min-h-screen">
+        <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
+              <p className="text-2xl font-bold mb-2 text-slate-700">No lunch scheduled yet</p>
+              <p className="text-slate-400">Check back later!</p>
+            </div>
+          </div>
+          <div className="px-6 pb-8 space-y-5">
+            <Leaderboard participantKey={participantKey} />
+            <PastLunches />
+          </div>
+        </main>
       </div>
     );
   }
@@ -222,11 +232,22 @@ export default function HomePage() {
               preferredLocationId={preferredLocationId}
               onPreference={handlePreference}
               eventId={event.id}
+              participantKey={participantKey ?? undefined}
               onLocationAdded={refresh}
             />
           )}
 
           <AttendeeList responses={responses} locations={locations} currentParticipantKey={participantKey} />
+
+          <Leaderboard participantKey={participantKey} />
+
+          <PastLunches />
+
+          <div className="text-center pt-2 pb-4">
+            <a href="/admin" className="text-xs text-slate-300 hover:text-slate-500 transition-colors">
+              Admin
+            </a>
+          </div>
         </div>
         <ConnectionStatus state={connectionState} />
       </main>

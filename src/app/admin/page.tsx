@@ -6,8 +6,10 @@ import { CreateEventForm } from "@/components/admin/CreateEventForm";
 import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import { FinalizeControls } from "@/components/admin/FinalizeControls";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
-import { AttendeeList } from "@/components/event/AttendeeList";
+import { AdminLocationManager } from "@/components/admin/AdminLocationManager";
+import { AdminResponseManager } from "@/components/admin/AdminResponseManager";
 import { useEventStream } from "@/hooks/useEventStream";
+import { toast } from "sonner";
 import type { EventSnapshot } from "@/types";
 
 interface AdminPageProps {
@@ -15,10 +17,15 @@ interface AdminPageProps {
 }
 
 export default function AdminPage({ searchParams }: AdminPageProps) {
-  const { token } = use(searchParams);
+  const { token: urlToken } = use(searchParams);
+  const [tokenInput, setTokenInput] = useState("");
+  const [activeToken, setActiveToken] = useState<string | null>(urlToken ?? null);
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
+  const [reopening, setReopening] = useState(false);
+
+  const token = activeToken;
 
   const fetchData = useCallback(async () => {
     if (!token) return;
@@ -36,8 +43,6 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
   }, [token]);
 
   useEffect(() => {
-    // Validate token client-side by checking it's not empty
-    // Real validation happens on API calls
     if (token) {
       setAuthorized(true);
       fetchData();
@@ -46,6 +51,36 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
     }
   }, [token, fetchData]);
 
+  const handleTokenSubmit = () => {
+    const trimmed = tokenInput.trim();
+    if (trimmed) {
+      setActiveToken(trimmed);
+      setLoading(true);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!snapshot?.event || !confirm("Reopen this event? It will go back to voting.")) return;
+    setReopening(true);
+    try {
+      const res = await fetch(`/api/events/${snapshot.event.id}/finalize`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to reopen");
+        return;
+      }
+      toast.success("Event reopened!");
+      fetchData();
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setReopening(false);
+    }
+  };
+
   const eventId = initialSnapshot?.event?.id || null;
   const { snapshot: liveSnapshot } = useEventStream(eventId);
   const snapshot = liveSnapshot || initialSnapshot;
@@ -53,9 +88,28 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
   if (!authorized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
+        <div className="text-center space-y-4">
           <span className="material-symbols-outlined text-slate-300 text-[48px]">lock</span>
-          <p className="text-slate-400 mt-2">Unauthorized. Add ?token=YOUR_TOKEN to the URL.</p>
+          <p className="text-slate-400">Enter admin token</p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleTokenSubmit()}
+              placeholder="Token"
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+              autoFocus
+            />
+            <button
+              type="button"
+              onClick={handleTokenSubmit}
+              disabled={!tokenInput.trim()}
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+            >
+              Go
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -108,7 +162,17 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
             </div>
 
             {snapshot.event.status === "finalized" && (
-              <FinalizedBanner event={snapshot.event} locations={snapshot.locations} />
+              <>
+                <FinalizedBanner event={snapshot.event} locations={snapshot.locations} />
+                <button
+                  onClick={handleReopen}
+                  disabled={reopening}
+                  className="w-full border-2 border-dashed border-orange-500/20 text-orange-500 font-semibold py-3 rounded-full hover:bg-orange-500/5 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[20px]">undo</span>
+                  {reopening ? "Reopening..." : "Reopen for Voting"}
+                </button>
+              </>
             )}
 
             <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
@@ -122,7 +186,21 @@ export default function AdminPage({ searchParams }: AdminPageProps) {
               )}
             </div>
 
-            <AttendeeList responses={snapshot.responses} locations={snapshot.locations} />
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+              <AdminLocationManager
+                locations={snapshot.locations}
+                eventId={snapshot.event.id}
+                token={token!}
+                onChanged={fetchData}
+              />
+              <AdminResponseManager
+                responses={snapshot.responses}
+                locations={snapshot.locations}
+                eventId={snapshot.event.id}
+                token={token!}
+                onChanged={fetchData}
+              />
+            </div>
 
             {snapshot.event.status !== "open" && (
               <div className="pt-4">

@@ -6,6 +6,8 @@ export const LocationSchema = z.object({
   name: z.string().min(1),
   address: z.string().nullable(),
   mapsUrl: z.string().nullable(),
+  websiteUrl: z.string().nullable(),
+  addedBy: z.string().nullable(),
   createdAt: z.string(),
 });
 
@@ -36,6 +38,16 @@ export const CreateEventSchema = z.object({
 });
 
 export const AddLocationSchema = z.object({
+  name: z.string().min(1),
+  placeId: z.string().optional(),
+  addedBy: z.string().optional(),
+});
+
+export const DeleteLocationSchema = z.object({
+  participantKey: z.string().min(1),
+});
+
+export const RenameLocationSchema = z.object({
   name: z.string().min(1),
 });
 

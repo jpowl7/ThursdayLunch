@@ -1,7 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import type { Location, Response } from "@/lib/schemas";
+import { toast } from "sonner";
+
+interface PlaceSuggestion {
+  placeId: string;
+  mainText: string;
+  secondaryText: string;
+}
 
 interface LocationVotingProps {
   locations: Location[];
@@ -12,6 +19,7 @@ interface LocationVotingProps {
   onPreference?: (locationId: string | null) => void;
   disabled?: boolean;
   eventId?: string;
+  participantKey?: string;
   onLocationAdded?: () => void;
 }
 
@@ -24,10 +32,68 @@ export function LocationVoting({
   onPreference,
   disabled,
   eventId,
+  participantKey,
   onLocationAdded,
 }: LocationVotingProps) {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
+
+  // Duplicate check
+  const isDuplicate = newName.trim().length > 0 && locations.some(
+    (loc) => loc.name.toLowerCase() === newName.trim().toLowerCase()
+  );
+
+  // Fetch autocomplete suggestions
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (newName.trim().length < 2 || selectedPlaceId) {
+      setSuggestions([]);
+      return;
+    }
+
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/places/autocomplete?input=${encodeURIComponent(newName.trim())}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSuggestions(data);
+          setShowSuggestions(data.length > 0);
+        }
+      } catch {
+        // ignore
+      }
+    }, 300);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [newName, selectedPlaceId]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (
+        suggestionsRef.current &&
+        !suggestionsRef.current.contains(e.target as Node) &&
+        inputRef.current &&
+        !inputRef.current.contains(e.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   // Count votes and preferences per location
   const voteCounts = new Map<string, number>();
@@ -55,24 +121,67 @@ export function LocationVoting({
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
   );
 
+  const selectSuggestion = (s: PlaceSuggestion) => {
+    setNewName(s.mainText);
+    setSelectedPlaceId(s.placeId);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    inputRef.current?.focus();
+  };
+
+  const handleInputChange = (value: string) => {
+    setNewName(value);
+    setSelectedPlaceId(null); // Clear selection when user edits
+  };
+
   const handleAddLocation = async () => {
     const trimmed = newName.trim();
-    if (!trimmed || !eventId) return;
+    if (!trimmed || !eventId || isDuplicate) return;
     setAdding(true);
     try {
       const res = await fetch(`/api/events/${eventId}/locations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({
+          name: trimmed,
+          placeId: selectedPlaceId || undefined,
+          addedBy: participantKey || undefined,
+        }),
       });
       if (res.ok) {
         setNewName("");
+        setSelectedPlaceId(null);
+        setSuggestions([]);
         onLocationAdded?.();
+      } else {
+        const data = await res.json();
+        if (res.status === 409) {
+          toast.error(data.error || "Already exists");
+        }
       }
     } catch {
       // ignore
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleDelete = async (locationId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!eventId || !participantKey) return;
+    try {
+      const res = await fetch(`/api/events/${eventId}/locations/${locationId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantKey }),
+      });
+      if (res.ok) {
+        onLocationAdded?.(); // refresh
+      } else {
+        toast.error("Couldn't delete");
+      }
+    } catch {
+      toast.error("Couldn't delete");
     }
   };
 
@@ -86,11 +195,12 @@ export function LocationVoting({
         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Vote for your picks</span>
       </div>
       <div className="space-y-2">
-        {sorted.map((loc) => {
+        {(showAll || sorted.length <= 10 ? sorted : sorted.slice(0, 10)).map((loc) => {
           const isSelected = selectedIds.includes(loc.id);
           const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
           const prefs = prefCounts.get(loc.id) || 0;
+          const canDelete = loc.addedBy === participantKey;
           return (
             <div
               key={loc.id}
@@ -109,6 +219,25 @@ export function LocationVoting({
                   <span className="material-symbols-outlined text-[16px] font-bold">check</span>
                 )}
               </div>
+
+              {/* Favicon */}
+              {loc.websiteUrl && (() => {
+                try {
+                  const domain = new URL(loc.websiteUrl).hostname;
+                  return (
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+                      alt=""
+                      width={24}
+                      height={24}
+                      className="flex-shrink-0 rounded-sm"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                    />
+                  );
+                } catch {
+                  return null;
+                }
+              })()}
 
               {/* Name + address */}
               <div className="flex-1 min-w-0">
@@ -158,30 +287,96 @@ export function LocationVoting({
                   Map
                 </a>
               )}
+
+              {/* Delete button (only for locations you added) */}
+              {canDelete && !disabled && (
+                <button
+                  type="button"
+                  onClick={(e) => handleDelete(loc.id, e)}
+                  className="flex-shrink-0 p-0.5 rounded-full transition-all"
+                  title="Remove this location"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-500">
+                    close
+                  </span>
+                </button>
+              )}
             </div>
           );
         })}
+
+        {/* Show more / less toggle */}
+        {sorted.length > 10 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="w-full py-2 text-xs font-semibold text-slate-400 hover:text-orange-500 transition-colors"
+          >
+            {showAll ? "Show less" : `Show ${sorted.length - 10} more`}
+          </button>
+        )}
       </div>
 
       {/* Suggest a place */}
       {eventId && !disabled && (
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddLocation()}
-            placeholder="Suggest a place…"
-            className="flex-1 min-w-0 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
-          />
-          <button
-            type="button"
-            onClick={handleAddLocation}
-            disabled={adding || !newName.trim()}
-            className="px-3 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-default transition-colors"
-          >
-            {adding ? "Adding…" : "Add"}
-          </button>
+        <div className="relative">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={newName}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  setShowSuggestions(false);
+                  handleAddLocation();
+                }
+              }}
+              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+              placeholder="Suggest a place…"
+              className={`flex-1 min-w-0 px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
+                isDuplicate
+                  ? "border-red-300 focus:border-red-400 focus:ring-red-400"
+                  : "border-slate-200 focus:border-orange-400 focus:ring-orange-400"
+              }`}
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setShowSuggestions(false);
+                handleAddLocation();
+              }}
+              disabled={adding || !newName.trim() || isDuplicate}
+              className="px-3 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-default transition-colors"
+            >
+              {adding ? "Adding…" : "Add"}
+            </button>
+          </div>
+
+          {/* Duplicate warning */}
+          {isDuplicate && (
+            <p className="text-xs text-red-500 mt-1 ml-1">Already on the list</p>
+          )}
+
+          {/* Autocomplete dropdown */}
+          {showSuggestions && suggestions.length > 0 && (
+            <div
+              ref={suggestionsRef}
+              className="absolute left-0 right-12 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-30 overflow-hidden"
+            >
+              {suggestions.map((s) => (
+                <button
+                  key={s.placeId}
+                  type="button"
+                  onClick={() => selectSuggestion(s)}
+                  className="w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors border-b border-slate-50 last:border-b-0"
+                >
+                  <p className="text-sm font-semibold text-slate-800 truncate">{s.mainText}</p>
+                  <p className="text-xs text-slate-400 truncate">{s.secondaryText}</p>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

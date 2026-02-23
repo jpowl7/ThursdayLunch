@@ -27,5 +27,9 @@ export const UpsertResponseSchema = z.object({
   { message: "Preferred location must be one of your voted locations", path: ["preferredLocationId"] }
 );
 
+export const ToggleResponseSchema = z.object({
+  isIn: z.boolean(),
+});
+
 export type Response = z.infer<typeof ResponseSchema>;
 export type UpsertResponseInput = z.infer<typeof UpsertResponseSchema>;

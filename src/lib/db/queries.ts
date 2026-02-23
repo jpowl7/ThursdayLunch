@@ -2,7 +2,7 @@ import { getDb } from "./client";
 
 export async function getCurrentEvent() {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status = 'open' ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') ORDER BY created_at DESC LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -95,14 +95,80 @@ export async function upsertResponse(
   return response;
 }
 
-export async function addLocation(eventId: string, name: string) {
+export async function addLocation(
+  eventId: string,
+  name: string,
+  options?: { address?: string; mapsUrl?: string; websiteUrl?: string; addedBy?: string }
+) {
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO locations (event_id, name)
-    VALUES (${eventId}, ${name})
+    INSERT INTO locations (event_id, name, address, maps_url, website_url, added_by)
+    VALUES (${eventId}, ${name}, ${options?.address ?? null}, ${options?.mapsUrl ?? null}, ${options?.websiteUrl ?? null}, ${options?.addedBy ?? null})
     RETURNING *
   `;
   return mapLocation(rows[0]);
+}
+
+export async function deleteLocation(locationId: string, participantKey: string) {
+  const sql = getDb();
+  const rows = await sql`
+    DELETE FROM locations
+    WHERE id = ${locationId} AND added_by = ${participantKey}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function adminDeleteLocation(locationId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    DELETE FROM locations
+    WHERE id = ${locationId}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function updateLocationName(locationId: string, name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE locations SET name = ${name}
+    WHERE id = ${locationId}
+    RETURNING *
+  `;
+  return rows[0] ? mapLocation(rows[0]) : null;
+}
+
+export async function deleteResponse(responseId: string) {
+  const sql = getDb();
+  await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
+  const rows = await sql`
+    DELETE FROM responses
+    WHERE id = ${responseId}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function toggleResponseStatus(responseId: string, isIn: boolean) {
+  const sql = getDb();
+  if (!isIn) {
+    // Clear votes and preference when toggling out
+    await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
+    const rows = await sql`
+      UPDATE responses
+      SET is_in = false, preferred_location_id = NULL, updated_at = now()
+      WHERE id = ${responseId}
+      RETURNING *
+    `;
+    return rows[0] || null;
+  }
+  const rows = await sql`
+    UPDATE responses SET is_in = true, updated_at = now()
+    WHERE id = ${responseId}
+    RETURNING *
+  `;
+  return rows[0] || null;
 }
 
 export async function finalizeEvent(id: string, chosenTime: string, chosenLocationId: string) {
@@ -131,6 +197,203 @@ function normalizeDate(val: unknown): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+export async function reopenEvent(id: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events
+    SET status = 'open', chosen_time = NULL, chosen_location_id = NULL
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+// ── Leaderboard queries ──────────────────────────────────────
+
+export async function getPastLunches(limit = 10) {
+  const sql = getDb();
+  const events = await sql`
+    SELECT e.*, l.name AS location_name, l.address AS location_address, l.maps_url AS location_maps_url
+    FROM events e
+    LEFT JOIN locations l ON l.id = e.chosen_location_id
+    WHERE e.status = 'finalized'
+    ORDER BY e.date DESC
+    LIMIT ${limit}
+  `;
+
+  if (events.length === 0) return [];
+
+  const eventIds = events.map((e) => e.id as string);
+  const attendees = await sql`
+    SELECT r.event_id, r.name
+    FROM responses r
+    WHERE r.event_id = ANY(${eventIds}) AND r.is_in = true
+    ORDER BY r.created_at
+  `;
+
+  const attendeesByEvent = new Map<string, string[]>();
+  for (const a of attendees) {
+    const eid = a.event_id as string;
+    if (!attendeesByEvent.has(eid)) attendeesByEvent.set(eid, []);
+    attendeesByEvent.get(eid)!.push(a.name as string);
+  }
+
+  return events.map((e) => ({
+    id: e.id as string,
+    date: normalizeDate(e.date),
+    chosenTime: e.chosen_time ? normalizeTime(e.chosen_time) : null,
+    locationName: (e.location_name as string) || null,
+    locationAddress: (e.location_address as string) || null,
+    locationMapsUrl: (e.location_maps_url as string) || null,
+    attendees: attendeesByEvent.get(e.id as string) || [],
+  }));
+}
+
+export async function getFinalizedEventCount(): Promise<number> {
+  const sql = getDb();
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM events WHERE status = 'finalized'`;
+  return rows[0].count;
+}
+
+export async function getLeaderboardAttendance() {
+  const sql = getDb();
+  return sql`
+    SELECT r.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = r.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    WHERE r.is_in = true
+    GROUP BY r.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
+}
+
+export async function getLeaderboardTastemaker() {
+  const sql = getDb();
+  return sql`
+    SELECT r.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = r.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    WHERE r.is_in = true
+      AND r.preferred_location_id IS NOT NULL
+      AND r.preferred_location_id = e.chosen_location_id
+    GROUP BY r.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
+}
+
+export async function getLeaderboardFirstResponder() {
+  const sql = getDb();
+  return sql`
+    WITH first_responders AS (
+      SELECT DISTINCT ON (r.event_id)
+             r.participant_key
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+      WHERE r.is_in = true
+      ORDER BY r.event_id, r.created_at
+    )
+    SELECT fr.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM first_responders fr
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = fr.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    GROUP BY fr.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
+}
+
+export async function getLeaderboardStreaks() {
+  const sql = getDb();
+  // Get finalized events ordered newest-first, then compute streaks in JS
+  const events = await sql`
+    SELECT e.id
+    FROM events e
+    WHERE e.status = 'finalized'
+    ORDER BY e.date DESC
+  `;
+  if (events.length === 0) return [];
+
+  // Get all attendees for finalized events
+  const attendees = await sql`
+    SELECT r.event_id, r.participant_key
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    WHERE r.is_in = true
+  `;
+
+  // Build set of attendees per event
+  const eventAttendees = new Map<string, Set<string>>();
+  for (const row of attendees) {
+    const eventId = row.event_id as string;
+    const pk = row.participant_key as string;
+    if (!eventAttendees.has(eventId)) eventAttendees.set(eventId, new Set());
+    eventAttendees.get(eventId)!.add(pk);
+  }
+
+  // Collect all participant keys
+  const allParticipants = new Set<string>();
+  for (const row of attendees) allParticipants.add(row.participant_key as string);
+
+  // Walk events newest-first, compute streak per participant
+  const streaks = new Map<string, number>();
+  for (const pk of allParticipants) {
+    let streak = 0;
+    for (const event of events) {
+      const set = eventAttendees.get(event.id as string);
+      if (set?.has(pk)) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    if (streak > 0) streaks.set(pk, streak);
+  }
+
+  if (streaks.size === 0) return [];
+
+  // Sort by streak desc, take top 10
+  const sorted = [...streaks.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+
+  // Get names
+  const keys = sorted.map((s) => s[0]);
+  const names = await sql`
+    SELECT DISTINCT ON (participant_key) participant_key, name
+    FROM responses
+    WHERE participant_key = ANY(${keys})
+    ORDER BY participant_key, created_at DESC
+  `;
+  const nameMap = new Map(names.map((n) => [n.participant_key as string, n.name as string]));
+
+  return sorted.map(([pk, count]) => ({
+    participant_key: pk,
+    name: nameMap.get(pk) || "Unknown",
+    count,
+  }));
+}
+
 // Row mappers (snake_case DB columns -> camelCase)
 function mapEvent(row: Record<string, unknown>) {
   return {
@@ -153,6 +416,8 @@ function mapLocation(row: Record<string, unknown>) {
     name: row.name as string,
     address: (row.address as string) || null,
     mapsUrl: (row.maps_url as string) || null,
+    websiteUrl: (row.website_url as string) || null,
+    addedBy: (row.added_by as string) || null,
     createdAt: String(row.created_at),
   };
 }

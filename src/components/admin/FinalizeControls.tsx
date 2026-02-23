@@ -12,25 +12,56 @@ interface FinalizeControlsProps {
 
 export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeControlsProps) {
   const { event, locations, responses } = snapshot;
-  const [chosenTime, setChosenTime] = useState(event.earliestTime);
-  const [chosenLocationId, setChosenLocationId] = useState(locations[0]?.id || "");
-  const [submitting, setSubmitting] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState("");
+  const inResponses = responses.filter((r) => r.isIn);
 
   // Count votes and preferences for display in dropdown
   const voteCounts = new Map<string, number>();
   const prefCounts = new Map<string, number>();
-  for (const r of responses) {
-    if (r.isIn) {
-      for (const locId of r.locationVotes) {
-        voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
-      }
-      if (r.preferredLocationId) {
-        prefCounts.set(r.preferredLocationId, (prefCounts.get(r.preferredLocationId) || 0) + 1);
-      }
+  for (const r of inResponses) {
+    for (const locId of r.locationVotes) {
+      voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
+    }
+    if (r.preferredLocationId) {
+      prefCounts.set(r.preferredLocationId, (prefCounts.get(r.preferredLocationId) || 0) + 1);
     }
   }
+
+  // Default to most-voted location
+  const topLocationId = [...locations].sort(
+    (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
+  )[0]?.id || "";
+
+  // Default to peak overlap start time
+  const defaultTime = (() => {
+    if (inResponses.length === 0) return event.earliestTime;
+    const [eh, em] = event.earliestTime.split(":").map(Number);
+    const [lh, lm] = event.latestTime.split(":").map(Number);
+    const startMin = eh * 60 + em;
+    const endMin = lh * 60 + lm;
+    let maxCount = 0;
+    let peakTime = event.earliestTime;
+    for (let m = startMin; m <= endMin; m += 15) {
+      let count = 0;
+      for (const r of inResponses) {
+        if (r.availableFrom && r.availableTo) {
+          const [fh, fm2] = r.availableFrom.split(":").map(Number);
+          const [th, tm2] = r.availableTo.split(":").map(Number);
+          if (m >= fh * 60 + fm2 && m <= th * 60 + tm2) count++;
+        }
+      }
+      if (count > maxCount) {
+        maxCount = count;
+        peakTime = `${Math.floor(m / 60).toString().padStart(2, "0")}:${(m % 60).toString().padStart(2, "0")}`;
+      }
+    }
+    return peakTime;
+  })();
+
+  const [chosenTime, setChosenTime] = useState(defaultTime);
+  const [chosenLocationId, setChosenLocationId] = useState(topLocationId);
+  const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
 
   const sortedLocations = [...locations].sort(
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)

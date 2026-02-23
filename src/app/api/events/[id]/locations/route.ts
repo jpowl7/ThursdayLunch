@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { AddLocationSchema } from "@/lib/schemas";
-import { addLocation, getEventById } from "@/lib/db/queries";
+import { addLocation, getEventById, getEventSnapshot } from "@/lib/db/queries";
+import { getPlaceDetails, lookupPlace } from "@/lib/google-places";
 
 export async function POST(
   request: NextRequest,
@@ -22,7 +23,30 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const location = await addLocation(id, parsed.data.name);
+    // Check for duplicate name (case-insensitive)
+    const snapshot = await getEventSnapshot(id);
+    const existing = snapshot?.locations ?? [];
+    const isDuplicate = existing.some(
+      (loc) => loc.name.toLowerCase() === parsed.data.name.toLowerCase()
+    );
+    if (isDuplicate) {
+      return NextResponse.json({ error: "A location with that name already exists" }, { status: 409 });
+    }
+
+    // Resolve address + maps URL + website
+    let placeInfo: { address: string; mapsUrl: string; websiteUrl?: string | null } | null = null;
+    if (parsed.data.placeId) {
+      placeInfo = await getPlaceDetails(parsed.data.placeId);
+    } else {
+      placeInfo = await lookupPlace(parsed.data.name);
+    }
+
+    const location = await addLocation(id, parsed.data.name, {
+      address: placeInfo?.address,
+      mapsUrl: placeInfo?.mapsUrl,
+      websiteUrl: placeInfo?.websiteUrl ?? undefined,
+      addedBy: parsed.data.addedBy,
+    });
     return NextResponse.json(location, { status: 201 });
   } catch (error) {
     console.error("Error adding location:", error);

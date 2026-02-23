@@ -11,3 +11,17 @@ export interface LocationVoteTally {
   locationName: string;
   count: number;
 }
+
+export interface LeaderboardEntry {
+  participantKey: string;
+  name: string;
+  count: number;
+}
+
+export interface LeaderboardData {
+  totalEvents: number;
+  attendance: LeaderboardEntry[];
+  tastemaker: LeaderboardEntry[];
+  firstResponder: LeaderboardEntry[];
+  streaks: LeaderboardEntry[];
+}

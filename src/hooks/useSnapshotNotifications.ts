@@ -125,10 +125,15 @@ export function useSnapshotNotifications(
     }
 
     // Detect new locations
+    const nameByKey = new Map<string, string>();
+    for (const r of snapshot.responses) {
+      nameByKey.set(r.participantKey, r.name);
+    }
     const prevLocationIds = new Set(prev.locations.map((l: Location) => l.id));
     for (const loc of snapshot.locations) {
       if (!prevLocationIds.has(loc.id)) {
-        messages.push(`New spot: ${loc.name}`);
+        const adder = loc.addedBy ? nameByKey.get(loc.addedBy) : null;
+        messages.push(adder ? `${adder} added ${loc.name}` : `New spot: ${loc.name}`);
       }
     }
 
