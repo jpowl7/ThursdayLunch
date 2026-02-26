@@ -91,6 +91,69 @@ export async function getPlaceDetails(
   }
 }
 
+export interface NearbyRestaurant {
+  id: string;
+  name: string;
+  address: string;
+  mapsUri: string;
+  websiteUri: string | null;
+  priceLevel: string | null;
+  typeName: string | null;
+}
+
+export async function searchNearbyRestaurants(): Promise<NearbyRestaurant[]> {
+  if (!API_KEY) return [];
+
+  try {
+    const res = await fetch(
+      "https://places.googleapis.com/v1/places:searchNearby",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": API_KEY,
+          "X-Goog-FieldMask":
+            "places.id,places.displayName,places.formattedAddress,places.priceLevel,places.googleMapsUri,places.websiteUri,places.primaryTypeDisplayName",
+        },
+        body: JSON.stringify({
+          includedTypes: ["restaurant", "cafe", "meal_takeaway", "fast_food_restaurant"],
+          locationRestriction: {
+            circle: {
+              center: { latitude: 41.7318, longitude: -86.1145 },
+              radius: 4000,
+            },
+          },
+          maxResultCount: 20,
+        }),
+      }
+    );
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const places = data.places ?? [];
+
+    return places
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((p: any) => {
+        const level = p.priceLevel;
+        return level !== "PRICE_LEVEL_EXPENSIVE" && level !== "PRICE_LEVEL_VERY_EXPENSIVE";
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((p: any) => ({
+        id: p.id ?? "",
+        name: p.displayName?.text ?? "",
+        address: p.formattedAddress ?? "",
+        mapsUri: p.googleMapsUri ?? "",
+        websiteUri: p.websiteUri ?? null,
+        priceLevel: p.priceLevel ?? null,
+        typeName: p.primaryTypeDisplayName?.text ?? null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function lookupPlace(
   query: string
 ): Promise<{ address: string; mapsUrl: string } | null> {

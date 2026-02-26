@@ -2,6 +2,6 @@
 
 import { EventPageContent } from "@/components/EventPageContent";
 
-export default function HomePage() {
-  return <EventPageContent />;
+export default function DevPage() {
+  return <EventPageContent isDev />;
 }

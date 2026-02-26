@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCurrentEvent, getEventSnapshot } from "@/lib/db/queries";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const event = await getCurrentEvent();
+    const isDev = request.nextUrl.searchParams.get("dev") === "true";
+    const event = await getCurrentEvent(isDev);
     if (!event) {
       return NextResponse.json({ error: "No open event found" }, { status: 404 });
     }

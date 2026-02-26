@@ -1,8 +1,8 @@
 import { getDb } from "./client";
 
-export async function getCurrentEvent() {
+export async function getCurrentEvent(isDev = false) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND is_dev = ${isDev} ORDER BY created_at DESC LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -36,16 +36,17 @@ export async function getEventSnapshot(eventId: string) {
 
 export async function createEvent(
   input: { title: string; date: string; earliestTime: string; latestTime: string },
-  locations: { name: string; address?: string; mapsUrl?: string }[]
+  locations: { name: string; address?: string; mapsUrl?: string }[],
+  isDev = false
 ) {
   const sql = getDb();
 
-  // Close any open events first
-  await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open'`;
+  // Close any open events in the same mode (dev or prod)
+  await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open' AND is_dev = ${isDev}`;
 
   const eventRows = await sql`
-    INSERT INTO events (title, date, earliest_time, latest_time)
-    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime})
+    INSERT INTO events (title, date, earliest_time, latest_time, is_dev)
+    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${isDev})
     RETURNING *
   `;
 
@@ -392,6 +393,81 @@ export async function getLeaderboardStreaks() {
     name: nameMap.get(pk) || "Unknown",
     count,
   }));
+}
+
+export async function getLeaderboardSpeedDemon() {
+  const sql = getDb();
+  return sql`
+    SELECT r.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = r.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    WHERE r.is_in = true
+      AND r.created_at <= e.created_at + INTERVAL '5 minutes'
+    GROUP BY r.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
+}
+
+export async function getLeaderboardFashionablyLate() {
+  const sql = getDb();
+  return sql`
+    WITH last_responders AS (
+      SELECT DISTINCT ON (r.event_id)
+             r.participant_key
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+      WHERE r.is_in = true
+      ORDER BY r.event_id, r.created_at DESC
+    )
+    SELECT lr.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM last_responders lr
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = lr.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    GROUP BY lr.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
+}
+
+export async function getLeaderboardTrendsetter() {
+  const sql = getDb();
+  return sql`
+    WITH first_voters AS (
+      SELECT DISTINCT ON (e.id)
+             r.participant_key
+      FROM events e
+      JOIN responses r ON r.event_id = e.id
+      JOIN location_votes lv ON lv.response_id = r.id AND lv.location_id = e.chosen_location_id
+      WHERE e.status = 'finalized'
+        AND e.chosen_location_id IS NOT NULL
+      ORDER BY e.id, lv.created_at ASC
+    )
+    SELECT fv.participant_key,
+           latest_name.name,
+           COUNT(*)::int AS count
+    FROM first_voters fv
+    JOIN LATERAL (
+      SELECT r2.name FROM responses r2
+      WHERE r2.participant_key = fv.participant_key
+      ORDER BY r2.created_at DESC LIMIT 1
+    ) latest_name ON true
+    GROUP BY fv.participant_key, latest_name.name
+    ORDER BY count DESC, latest_name.name
+    LIMIT 10
+  `;
 }
 
 // Row mappers (snake_case DB columns -> camelCase)

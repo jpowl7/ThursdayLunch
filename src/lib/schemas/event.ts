@@ -35,6 +35,7 @@ export const CreateEventSchema = z.object({
   earliestTime: z.string(),
   latestTime: z.string(),
   locations: z.array(CreateLocationInput).min(1),
+  isDev: z.boolean().optional(),
 });
 
 export const AddLocationSchema = z.object({

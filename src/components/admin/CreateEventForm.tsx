@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 interface CreateEventFormProps {
   token: string;
   onCreated: () => void;
+  isDev?: boolean;
 }
 
 interface LocationInput {
@@ -14,7 +15,7 @@ interface LocationInput {
   mapsUrl: string;
 }
 
-export function CreateEventForm({ token, onCreated }: CreateEventFormProps) {
+export function CreateEventForm({ token, onCreated, isDev = false }: CreateEventFormProps) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [earliestTime, setEarliestTime] = useState("11:30");
@@ -63,6 +64,7 @@ export function CreateEventForm({ token, onCreated }: CreateEventFormProps) {
           date,
           earliestTime,
           latestTime,
+          ...(isDev && { isDev: true }),
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             address: l.address.trim() || undefined,

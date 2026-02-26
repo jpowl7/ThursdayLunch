@@ -124,6 +124,30 @@ export function Leaderboard({ participantKey }: { participantKey: string | null 
         participantKey={participantKey}
         unit="wins"
       />
+      <LeaderboardSection
+        title="Speed Demon"
+        icon="speed"
+        description="Responded within 5 minutes of event creation"
+        entries={data.speedDemon}
+        participantKey={participantKey}
+        unit="times"
+      />
+      <LeaderboardSection
+        title="Fashionably Late"
+        icon="schedule"
+        description="Last person to RSVP for a finalized event"
+        entries={data.fashionablyLate}
+        participantKey={participantKey}
+        unit="times"
+      />
+      <LeaderboardSection
+        title="Trendsetter"
+        icon="trending_up"
+        description="First to vote for the winning restaurant"
+        entries={data.trendsetter}
+        participantKey={participantKey}
+        unit="wins"
+      />
     </div>
   );
 }

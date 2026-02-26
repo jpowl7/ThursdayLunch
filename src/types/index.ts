@@ -24,4 +24,7 @@ export interface LeaderboardData {
   tastemaker: LeaderboardEntry[];
   firstResponder: LeaderboardEntry[];
   streaks: LeaderboardEntry[];
+  speedDemon: LeaderboardEntry[];
+  fashionablyLate: LeaderboardEntry[];
+  trendsetter: LeaderboardEntry[];
 }
