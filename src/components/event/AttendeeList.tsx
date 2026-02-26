@@ -25,8 +25,9 @@ function getInitials(name: string): string {
 
 export function AttendeeList({ responses, locations, currentParticipantKey }: AttendeeListProps) {
   const locationMap = new Map(locations.map((l) => [l.id, l.name]));
-  const inResponses = responses.filter((r) => r.isIn);
-  const outResponses = responses.filter((r) => !r.isIn);
+  const inResponses = responses.filter((r) => r.status === "in");
+  const maybeResponses = responses.filter((r) => r.status === "maybe");
+  const outResponses = responses.filter((r) => r.status === "out");
 
   return (
     <div className="space-y-3">
@@ -96,6 +97,39 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
           </div>
           );
         })}
+
+        {maybeResponses.length > 0 && (
+          <>
+            <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mt-4 px-1">Maybe ({maybeResponses.length})</p>
+            {maybeResponses.map((r) => {
+              const isMe = r.participantKey === currentParticipantKey;
+              return (
+                <div
+                  key={r.id}
+                  className={`flex items-center gap-4 bg-amber-50/60 p-2.5 rounded-xl ${
+                    isMe ? "border-2 border-amber-400 ring-1 ring-amber-400/20" : "border border-amber-100"
+                  }`}
+                >
+                  <div className="relative">
+                    <div className={`size-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white shadow-sm ${
+                      isMe ? "bg-amber-200 text-amber-800" : "bg-amber-100 text-amber-700"
+                    }`}>
+                      {getInitials(r.name)}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 size-5 bg-amber-400 rounded-full border-2 border-white flex items-center justify-center">
+                      <span className="material-symbols-outlined text-white text-[12px] font-bold">question_mark</span>
+                    </div>
+                  </div>
+                  <p className="font-medium text-sm text-amber-700">
+                    {r.name}
+                    {isMe && <span className="text-[10px] text-amber-500 font-bold ml-1.5">(You)</span>}
+                  </p>
+                </div>
+              );
+            })}
+          </>
+        )}
+
         {outResponses.length > 0 && (
           <>
             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-4 px-1">Not coming</p>

@@ -65,17 +65,17 @@ async function seed() {
 
   // Add test participants
   const users = [
-    { key: "seed-alice-001", name: "Alice", isIn: true, from: "11:30", to: "12:30", votes: [thaiId, sushiId], preferred: thaiId },
-    { key: "seed-bob-002", name: "Bob", isIn: true, from: "12:00", to: "13:00", votes: [burgerId, thaiId], preferred: burgerId },
-    { key: "seed-carol-003", name: "Carol", isIn: true, from: "11:00", to: "12:30", votes: [sushiId], preferred: sushiId },
-    { key: "seed-dave-004", name: "Dave", isIn: true, from: "11:30", to: "13:00", votes: [thaiId, burgerId, sushiId], preferred: null },
-    { key: "seed-eve-005", name: "Eve", isIn: false, from: null, to: null, votes: [], preferred: null },
+    { key: "seed-alice-001", name: "Alice", status: "in" as const, from: "11:30", to: "12:30", votes: [thaiId, sushiId], preferred: thaiId },
+    { key: "seed-bob-002", name: "Bob", status: "in" as const, from: "12:00", to: "13:00", votes: [burgerId, thaiId], preferred: burgerId },
+    { key: "seed-carol-003", name: "Carol", status: "in" as const, from: "11:00", to: "12:30", votes: [sushiId], preferred: sushiId },
+    { key: "seed-dave-004", name: "Dave", status: "in" as const, from: "11:30", to: "13:00", votes: [thaiId, burgerId, sushiId], preferred: null },
+    { key: "seed-eve-005", name: "Eve", status: "out" as const, from: null, to: null, votes: [], preferred: null },
   ];
 
   for (const u of users) {
     const res = await sql`
-      INSERT INTO responses (event_id, participant_key, name, is_in, available_from, available_to, preferred_location_id)
-      VALUES (${eventId}, ${u.key}, ${u.name}, ${u.isIn}, ${u.from}, ${u.to}, ${u.preferred})
+      INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id)
+      VALUES (${eventId}, ${u.key}, ${u.name}, ${u.status}, ${u.from}, ${u.to}, ${u.preferred})
       RETURNING id
     `;
     for (const locId of u.votes) {

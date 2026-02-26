@@ -53,7 +53,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
     (r) => r.participantKey === participantKey
   );
 
-  const [isIn, setIsIn] = useState(false);
+  const [status, setStatus] = useState<"in" | "out" | "maybe">("out");
   const [name, setName] = useState(savedName || "");
   const [availableFrom, setAvailableFrom] = useState<string | null>(null);
   const [availableTo, setAvailableTo] = useState<string | null>(null);
@@ -79,7 +79,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
     ) return;
     lastSyncedId.current = myResponse.id;
     lastSyncedUpdatedAt.current = myResponse.updatedAt;
-    setIsIn(myResponse.isIn);
+    setStatus(myResponse.status);
     setName(myResponse.name);
     persistName(myResponse.name);
     setAvailableFrom(myResponse.availableFrom);
@@ -90,7 +90,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
 
   const submitResponse = useCallback(
     async (updates: {
-      isIn: boolean;
+      status: "in" | "out" | "maybe";
       name: string;
       availableFrom: string | null;
       availableTo: string | null;
@@ -117,28 +117,28 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
     [snapshot?.event, participantKey]
   );
 
-  const handleToggle = (newIsIn: boolean, newName: string) => {
-    setIsIn(newIsIn);
+  const handleToggle = (newStatus: "in" | "out" | "maybe", newName: string) => {
+    setStatus(newStatus);
     setName(newName);
     persistName(newName);
     const from = availableFrom || "12:00";
     const to = availableTo || snapshot?.event?.latestTime || "13:30";
-    if (newIsIn && !availableFrom) {
+    if (newStatus === "in" && !availableFrom) {
       setAvailableFrom(from);
       setAvailableTo(to);
     }
-    // Clear votes when opting out
-    const votes = newIsIn ? locationVotes : [];
-    const preferred = newIsIn ? preferredLocationId : null;
-    if (!newIsIn) {
+    // Clear votes when not "in"
+    const votes = newStatus === "in" ? locationVotes : [];
+    const preferred = newStatus === "in" ? preferredLocationId : null;
+    if (newStatus !== "in") {
       setLocationVotes([]);
       setPreferredLocationId(null);
     }
     submitResponse({
-      isIn: newIsIn,
+      status: newStatus,
       name: newName,
-      availableFrom: newIsIn ? from : availableFrom,
-      availableTo: newIsIn ? to : availableTo,
+      availableFrom: newStatus === "in" ? from : availableFrom,
+      availableTo: newStatus === "in" ? to : availableTo,
       locationVotes: votes,
       preferredLocationId: preferred,
     });
@@ -147,7 +147,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
   const handleTimeChange = (from: string, to: string) => {
     setAvailableFrom(from);
     setAvailableTo(to);
-    submitResponse({ isIn, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId });
+    submitResponse({ status, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId });
   };
 
   const handleVote = (newVotes: string[]) => {
@@ -157,12 +157,12 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
       : null;
     setLocationVotes(newVotes);
     setPreferredLocationId(newPreferred);
-    submitResponse({ isIn, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred });
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred });
   };
 
   const handlePreference = (locationId: string | null) => {
     setPreferredLocationId(locationId);
-    submitResponse({ isIn, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId });
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId });
   };
 
   if (loading) {
@@ -224,7 +224,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
           {isFinalized && <FinalizedBanner event={event} locations={locations} />}
 
           <AttendeeToggle
-            isIn={isIn}
+            status={status}
             name={name}
             onToggle={handleToggle}
             disabled={isFinalized}
@@ -234,7 +234,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
             <SummaryPanel snapshot={snapshot} showTimeDistribution={false} />
           )}
 
-          {isIn && !isFinalized && (
+          {status === "in" && !isFinalized && (
             <TimeRangeSlider
               earliestTime={event.earliestTime}
               latestTime={event.latestTime}
@@ -244,7 +244,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
             />
           )}
 
-          {isIn && !isFinalized && (
+          {status === "in" && !isFinalized && (
             <LocationVoting
               locations={locations}
               responses={responses}

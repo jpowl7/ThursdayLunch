@@ -52,7 +52,7 @@ export async function PATCH(
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const updated = await toggleResponseStatus(responseId, parsed.data.isIn);
+    const updated = await toggleResponseStatus(responseId, parsed.data.status);
     if (!updated) {
       return NextResponse.json({ error: "Response not found" }, { status: 404 });
     }

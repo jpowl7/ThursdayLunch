@@ -15,7 +15,7 @@ function formatTime(time: string | null): string {
 
 export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryPanelProps) {
   const { event, responses, locations } = snapshot;
-  const inResponses = responses.filter((r) => r.isIn);
+  const inResponses = responses.filter((r) => r.status === "in");
 
   // Vote and preference tally
   const voteCounts = new Map<string, number>();
@@ -73,15 +73,20 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
     <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50">
           <span className="material-symbols-outlined text-green-600 text-[20px]">sentiment_satisfied</span>
           <span className="text-2xl font-bold text-green-600">{inResponses.length}</span>
           <span className="text-sm text-green-600 font-medium">Going</span>
         </div>
+        <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-amber-50">
+          <span className="material-symbols-outlined text-amber-500 text-[20px]">help</span>
+          <span className="text-2xl font-bold text-amber-500">{responses.filter((r) => r.status === "maybe").length}</span>
+          <span className="text-sm text-amber-500 font-medium">Maybe</span>
+        </div>
         <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50">
           <span className="material-symbols-outlined text-red-400 text-[20px]">sentiment_dissatisfied</span>
-          <span className="text-2xl font-bold text-red-400">{responses.length - inResponses.length}</span>
+          <span className="text-2xl font-bold text-red-400">{responses.filter((r) => r.status === "out").length}</span>
           <span className="text-sm text-red-400 font-medium">Out</span>
         </div>
       </div>

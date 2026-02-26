@@ -65,16 +65,16 @@ export async function createEvent(
 export async function upsertResponse(
   eventId: string,
   participantKey: string,
-  input: { name: string; isIn: boolean; availableFrom: string | null; availableTo: string | null; locationVotes: string[]; preferredLocationId: string | null }
+  input: { name: string; status: "in" | "out" | "maybe"; availableFrom: string | null; availableTo: string | null; locationVotes: string[]; preferredLocationId: string | null }
 ) {
   const sql = getDb();
 
   const rows = await sql`
-    INSERT INTO responses (event_id, participant_key, name, is_in, available_from, available_to, preferred_location_id)
-    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.isIn}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
+    INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id)
+    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
     ON CONFLICT (event_id, participant_key) DO UPDATE SET
       name = ${input.name},
-      is_in = ${input.isIn},
+      status = ${input.status},
       available_from = ${input.availableFrom},
       available_to = ${input.availableTo},
       preferred_location_id = ${input.preferredLocationId},
@@ -151,21 +151,21 @@ export async function deleteResponse(responseId: string) {
   return rows[0] || null;
 }
 
-export async function toggleResponseStatus(responseId: string, isIn: boolean) {
+export async function toggleResponseStatus(responseId: string, status: "in" | "out" | "maybe") {
   const sql = getDb();
-  if (!isIn) {
-    // Clear votes and preference when toggling out
+  if (status !== "in") {
+    // Clear votes and preference when toggling to out or maybe
     await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
     const rows = await sql`
       UPDATE responses
-      SET is_in = false, preferred_location_id = NULL, updated_at = now()
+      SET status = ${status}, preferred_location_id = NULL, available_from = NULL, available_to = NULL, updated_at = now()
       WHERE id = ${responseId}
       RETURNING *
     `;
     return rows[0] || null;
   }
   const rows = await sql`
-    UPDATE responses SET is_in = true, updated_at = now()
+    UPDATE responses SET status = 'in', updated_at = now()
     WHERE id = ${responseId}
     RETURNING *
   `;
@@ -228,7 +228,7 @@ export async function getPastLunches(limit = 10) {
   const attendees = await sql`
     SELECT r.event_id, r.name
     FROM responses r
-    WHERE r.event_id = ANY(${eventIds}) AND r.is_in = true
+    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in'
     ORDER BY r.created_at
   `;
 
@@ -269,7 +269,7 @@ export async function getLeaderboardAttendance() {
       WHERE r2.participant_key = r.participant_key
       ORDER BY r2.created_at DESC LIMIT 1
     ) latest_name ON true
-    WHERE r.is_in = true
+    WHERE r.status = 'in'
     GROUP BY r.participant_key, latest_name.name
     ORDER BY count DESC, latest_name.name
     LIMIT 10
@@ -289,7 +289,7 @@ export async function getLeaderboardTastemaker() {
       WHERE r2.participant_key = r.participant_key
       ORDER BY r2.created_at DESC LIMIT 1
     ) latest_name ON true
-    WHERE r.is_in = true
+    WHERE r.status = 'in'
       AND r.preferred_location_id IS NOT NULL
       AND r.preferred_location_id = e.chosen_location_id
     GROUP BY r.participant_key, latest_name.name
@@ -306,7 +306,7 @@ export async function getLeaderboardFirstResponder() {
              r.participant_key
       FROM responses r
       JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
-      WHERE r.is_in = true
+      WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at
     )
     SELECT fr.participant_key,
@@ -340,7 +340,7 @@ export async function getLeaderboardStreaks() {
     SELECT r.event_id, r.participant_key
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
-    WHERE r.is_in = true
+    WHERE r.status = 'in'
   `;
 
   // Build set of attendees per event
@@ -408,7 +408,7 @@ export async function getLeaderboardSpeedDemon() {
       WHERE r2.participant_key = r.participant_key
       ORDER BY r2.created_at DESC LIMIT 1
     ) latest_name ON true
-    WHERE r.is_in = true
+    WHERE r.status = 'in'
       AND r.created_at <= e.created_at + INTERVAL '5 minutes'
     GROUP BY r.participant_key, latest_name.name
     ORDER BY count DESC, latest_name.name
@@ -424,7 +424,7 @@ export async function getLeaderboardFashionablyLate() {
              r.participant_key
       FROM responses r
       JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
-      WHERE r.is_in = true
+      WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at DESC
     )
     SELECT lr.participant_key,
@@ -517,7 +517,7 @@ function mapResponse(row: Record<string, unknown>) {
     eventId: row.event_id as string,
     participantKey: row.participant_key as string,
     name: row.name as string,
-    isIn: row.is_in as boolean,
+    status: (row.status as "in" | "out" | "maybe") || "out",
     availableFrom: row.available_from ? normalizeTime(row.available_from) : null,
     availableTo: row.available_to ? normalizeTime(row.available_to) : null,
     locationVotes: votes,

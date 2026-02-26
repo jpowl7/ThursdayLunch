@@ -79,17 +79,23 @@ export function useSnapshotNotifications(
 
       if (!prevR) {
         // New participant joined
-        if (r.isIn) {
+        if (r.status === "in") {
           messages.push(`${r.name} is in!`);
+        } else if (r.status === "maybe") {
+          messages.push(`${r.name} is a maybe`);
         }
         continue;
       }
 
-      // Toggle in/out
-      if (r.isIn && !prevR.isIn) {
-        messages.push(`${r.name} is in!`);
-      } else if (!r.isIn && prevR.isIn) {
-        messages.push(`${r.name} is out`);
+      // Status changes
+      if (r.status !== prevR.status) {
+        if (r.status === "in") {
+          messages.push(`${r.name} is in!`);
+        } else if (r.status === "maybe") {
+          messages.push(`${r.name} is a maybe`);
+        } else if (r.status === "out") {
+          messages.push(`${r.name} is out`);
+        }
       }
 
       // Vote changes (new votes only, ignore removals to reduce noise)
@@ -119,7 +125,7 @@ export function useSnapshotNotifications(
       const stillExists = snapshot.responses.some(
         (r) => r.participantKey === prevR.participantKey
       );
-      if (!stillExists && prevR.isIn) {
+      if (!stillExists && prevR.status === "in") {
         messages.push(`${prevR.name} is out`);
       }
     }

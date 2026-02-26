@@ -100,7 +100,7 @@ export function LocationVoting({
   const voteCounts = new Map<string, number>();
   const prefCounts = new Map<string, number>();
   for (const r of responses) {
-    if (r.isIn) {
+    if (r.status === "in") {
       for (const locId of r.locationVotes) {
         voteCounts.set(locId, (voteCounts.get(locId) || 0) + 1);
       }

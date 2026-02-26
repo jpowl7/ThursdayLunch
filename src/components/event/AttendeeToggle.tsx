@@ -11,53 +11,51 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type Status = "in" | "out" | "maybe";
+
 interface AttendeeToggleProps {
-  isIn: boolean;
+  status: Status;
   name: string;
-  onToggle: (isIn: boolean, name: string) => void;
+  onToggle: (status: Status, name: string) => void;
   disabled?: boolean;
 }
 
-export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggleProps) {
+export function AttendeeToggle({ status, name, onToggle, disabled }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
-  const [pendingIsIn, setPendingIsIn] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<Status>("in");
 
   // Sync nameInput when name prop changes (e.g., from SSE)
   useEffect(() => {
     if (name) setNameInput(name);
   }, [name]);
 
-  const handleIn = () => {
-    if (isIn) return;
+  const handleStatusClick = (newStatus: Status) => {
+    if (newStatus === status) return;
     if (!name) {
-      setPendingIsIn(true);
-      setShowNameDialog(true);
-    } else {
-      onToggle(true, name);
-    }
-  };
-
-  const handleOut = () => {
-    if (!isIn && !name) {
-      setPendingIsIn(false);
+      setPendingStatus(newStatus);
       setShowNameDialog(true);
       return;
     }
-    if (!isIn) return;
-    setShowConfirmDialog(true);
+    // Confirm when going from "in" to "maybe" or "out" (clears votes)
+    if (status === "in" && newStatus !== "in") {
+      setPendingStatus(newStatus);
+      setShowConfirmDialog(true);
+      return;
+    }
+    onToggle(newStatus, name);
   };
 
-  const handleConfirmOut = () => {
+  const handleConfirm = () => {
     setShowConfirmDialog(false);
-    onToggle(false, name);
+    onToggle(pendingStatus, name);
   };
 
   const handleNameSubmit = () => {
     if (nameInput.trim()) {
       setShowNameDialog(false);
-      onToggle(pendingIsIn, nameInput.trim());
+      onToggle(pendingStatus, nameInput.trim());
     }
   };
 
@@ -71,10 +69,10 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
       <div>
         <div className="bg-white rounded-xl p-2 shadow-sm border border-slate-100 flex gap-2">
           <button
-            onClick={handleIn}
+            onClick={() => handleStatusClick("in")}
             disabled={disabled}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
-              isIn
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg font-bold transition-all ${
+              status === "in"
                 ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
                 : "bg-slate-50 text-slate-400 hover:bg-slate-100"
             }`}
@@ -83,10 +81,22 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
             <span>I&apos;m In!</span>
           </button>
           <button
-            onClick={handleOut}
+            onClick={() => handleStatusClick("maybe")}
             disabled={disabled}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${
-              !isIn
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg font-bold transition-all ${
+              status === "maybe"
+                ? "bg-amber-400 text-white shadow-md shadow-amber-400/20"
+                : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+            }`}
+          >
+            <span className="material-symbols-outlined text-[20px]">help</span>
+            <span>Maybe</span>
+          </button>
+          <button
+            onClick={() => handleStatusClick("out")}
+            disabled={disabled}
+            className={`flex-1 flex items-center justify-center gap-1.5 py-3 rounded-lg font-bold transition-all ${
+              status === "out"
                 ? "bg-slate-200 text-slate-600 shadow-sm"
                 : "bg-slate-50 text-slate-400 hover:bg-slate-100"
             }`}
@@ -138,9 +148,9 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Heading out?</DialogTitle>
+            <DialogTitle>{pendingStatus === "maybe" ? "Switch to maybe?" : "Heading out?"}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-slate-500">Your votes will be cleared if you opt out.</p>
+          <p className="text-sm text-slate-500">Your votes and time selection will be cleared.</p>
           <div className="flex gap-3 pt-2">
             <Button
               variant="outline"
@@ -150,10 +160,10 @@ export function AttendeeToggle({ isIn, name, onToggle, disabled }: AttendeeToggl
               Never mind
             </Button>
             <Button
-              className="flex-1 bg-slate-700 hover:bg-slate-800"
-              onClick={handleConfirmOut}
+              className={`flex-1 ${pendingStatus === "maybe" ? "bg-amber-500 hover:bg-amber-600" : "bg-slate-700 hover:bg-slate-800"}`}
+              onClick={handleConfirm}
             >
-              I&apos;m out
+              {pendingStatus === "maybe" ? "I\u0027m a maybe" : "I\u0027m out"}
             </Button>
           </div>
         </DialogContent>

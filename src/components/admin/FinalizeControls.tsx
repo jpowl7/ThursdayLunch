@@ -12,7 +12,7 @@ interface FinalizeControlsProps {
 
 export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeControlsProps) {
   const { event, locations, responses } = snapshot;
-  const inResponses = responses.filter((r) => r.isIn);
+  const inResponses = responses.filter((r) => r.status === "in");
 
   // Count votes and preferences for display in dropdown
   const voteCounts = new Map<string, number>();
@@ -67,7 +67,8 @@ export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeContr
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
   );
 
-  const inCount = responses.filter((r) => r.isIn).length;
+  const inCount = responses.filter((r) => r.status === "in").length;
+  const maybeCount = responses.filter((r) => r.status === "maybe").length;
 
   const handleFinalize = async () => {
     setSubmitting(true);
@@ -152,7 +153,7 @@ export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeContr
 
       {inCount > 0 && (
         <p className="text-center text-[10px] text-slate-400 uppercase tracking-widest">
-          Sends notifications to {inCount} {inCount === 1 ? "person" : "people"}
+          {inCount} going{maybeCount > 0 ? `, ${maybeCount} maybe` : ""}
         </p>
       )}
 

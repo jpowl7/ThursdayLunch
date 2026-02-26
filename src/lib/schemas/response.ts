@@ -5,7 +5,7 @@ export const ResponseSchema = z.object({
   eventId: z.string().uuid(),
   participantKey: z.string(),
   name: z.string().min(1),
-  isIn: z.boolean(),
+  status: z.enum(["in", "out", "maybe"]),
   availableFrom: z.string().nullable(),
   availableTo: z.string().nullable(),
   locationVotes: z.array(z.string().uuid()),
@@ -17,7 +17,7 @@ export const ResponseSchema = z.object({
 export const UpsertResponseSchema = z.object({
   participantKey: z.string().min(1),
   name: z.string().min(1),
-  isIn: z.boolean(),
+  status: z.enum(["in", "out", "maybe"]),
   availableFrom: z.string().nullable(),
   availableTo: z.string().nullable(),
   locationVotes: z.array(z.string().uuid()),
@@ -28,7 +28,7 @@ export const UpsertResponseSchema = z.object({
 );
 
 export const ToggleResponseSchema = z.object({
-  isIn: z.boolean(),
+  status: z.enum(["in", "out", "maybe"]),
 });
 
 export type Response = z.infer<typeof ResponseSchema>;
