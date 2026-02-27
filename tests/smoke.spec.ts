@@ -4,7 +4,7 @@ test("landing page loads and renders", async ({ page }) => {
   await page.goto("/");
 
   // Landing page should show the app title and action buttons
-  await expect(page.getByRole("heading", { name: "Thursday Lunch" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "I LIKE LUNCH!" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Join a Group/i })).toBeVisible();
   await expect(page.getByRole("button", { name: /Create a Group/i })).toBeVisible();
 });

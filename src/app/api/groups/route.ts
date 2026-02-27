@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createGroup, getGroupBySlug } from "@/lib/db/queries";
+import { createGroup, getGroupBySlug, listGroups } from "@/lib/db/queries";
+
+export async function GET() {
+  try {
+    const groups = await listGroups();
+    return NextResponse.json(groups);
+  } catch (error) {
+    console.error("Error listing groups:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 
 const CreateGroupSchema = z.object({
   slug: z.string().min(1).max(50).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 function slugify(text: string): string {
   return text
@@ -22,6 +23,14 @@ export default function LandingPage() {
   const [passcode, setPasscode] = useState("");
   const [createError, setCreateError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [groups, setGroups] = useState<{ slug: string; name: string; eventCount: number }[]>([]);
+
+  useEffect(() => {
+    fetch("/api/groups")
+      .then((res) => (res.ok ? res.json() : []))
+      .then((data) => setGroups(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   const handleJoin = async () => {
     const slug = joinSlug.trim().toLowerCase();
@@ -85,7 +94,7 @@ export default function LandingPage() {
               lunch_dining
             </span>
             <h1 className="text-3xl font-bold mt-2 text-slate-800">
-              Thursday Lunch
+              I LIKE LUNCH!
             </h1>
             <p className="text-slate-400 mt-1">
               Organize group lunches, effortlessly
@@ -108,6 +117,26 @@ export default function LandingPage() {
                 <span className="material-symbols-outlined">add_circle</span>
                 Create a Group
               </button>
+
+              {groups.length > 0 && (
+                <div className="pt-4">
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2 px-1">
+                    Groups
+                  </h2>
+                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm divide-y divide-slate-100">
+                    {groups.map((group) => (
+                      <Link
+                        key={group.slug}
+                        href={`/g/${group.slug}`}
+                        className="flex items-center justify-between px-4 py-3 hover:bg-orange-50/50 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                      >
+                        <span className="text-sm font-semibold text-slate-700">{group.name}</span>
+                        <span className="material-symbols-outlined text-slate-300 text-[18px]">chevron_right</span>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

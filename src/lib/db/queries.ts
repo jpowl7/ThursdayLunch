@@ -43,6 +43,22 @@ export async function getGroupByEventId(eventId: string) {
   return rows[0] ? mapGroup(rows[0]) : null;
 }
 
+export async function listGroups() {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT g.slug, g.name, COUNT(e.id)::int AS event_count
+    FROM groups g
+    LEFT JOIN events e ON e.group_id = g.id
+    GROUP BY g.id
+    ORDER BY event_count DESC, g.created_at ASC
+  `;
+  return rows.map((r) => ({
+    slug: r.slug as string,
+    name: r.name as string,
+    eventCount: r.event_count as number,
+  }));
+}
+
 // ── Participant queries ────────────────────────────────────
 
 export async function createParticipant(name: string, pin: string, participantKey: string) {
