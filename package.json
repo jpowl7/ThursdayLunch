@@ -9,7 +9,8 @@
     "lint": "eslint",
     "type-check": "tsc --noEmit",
     "db:migrate": "npx tsx src/lib/db/migrate.ts",
-    "db:seed": "npx tsx src/lib/db/seed.ts"
+    "db:seed": "npx tsx src/lib/db/seed.ts",
+    "test:e2e": "npx playwright test"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
