@@ -10,6 +10,7 @@ import { AdminLocationManager } from "@/components/admin/AdminLocationManager";
 import { AdminResponseManager } from "@/components/admin/AdminResponseManager";
 import { useEventStream } from "@/hooks/useEventStream";
 import { toast } from "sonner";
+import Link from "next/link";
 import type { EventSnapshot } from "@/types";
 
 interface AdminPageContentProps {
@@ -24,6 +25,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const [authorized, setAuthorized] = useState(false);
   const [reopening, setReopening] = useState(false);
   const [groupName, setGroupName] = useState("");
+  const [isOpenGroup, setIsOpenGroup] = useState(false);
 
   // Change passcode state
   const [newPasscode, setNewPasscode] = useState("");
@@ -32,7 +34,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const apiUrl = `/api/events/current?group=${encodeURIComponent(groupSlug)}`;
 
   const fetchData = useCallback(async () => {
-    if (!activePasscode) return;
+    if (!activePasscode && !isOpenGroup) return;
     try {
       const res = await fetch(apiUrl);
       if (res.ok) {
@@ -44,20 +46,25 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
     } finally {
       setLoading(false);
     }
-  }, [activePasscode, apiUrl]);
+  }, [activePasscode, isOpenGroup, apiUrl]);
 
-  // Fetch group name
+  // Fetch group info — auto-authorize if no passcode required
   useEffect(() => {
     fetch(`/api/groups/${groupSlug}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.name) setGroupName(data.name);
+        if (data?.requiresPasscode === false) {
+          setIsOpenGroup(true);
+          setActivePasscode("");
+          setAuthorized(true);
+        }
       })
       .catch(() => {});
   }, [groupSlug]);
 
   useEffect(() => {
-    if (activePasscode) {
+    if (activePasscode !== null) {
       setAuthorized(true);
       fetchData();
     } else {
@@ -178,15 +185,22 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
           <h1 className="text-lg font-bold tracking-tight">{headerTitle}</h1>
         </div>
-        <a
-          href={`/g/${groupSlug}`}
-          className="text-sm text-slate-400 hover:text-orange-500 transition-colors"
-        >
-          View group
-        </a>
+        <div className="flex items-center gap-3">
+          <Link href="/" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Home</Link>
+          <a href={`/g/${groupSlug}`} className="text-sm text-slate-400 hover:text-orange-500 transition-colors">View group</a>
+        </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-4 space-y-6 pb-12">
+      <main className="max-w-[430px] mx-auto p-4 space-y-6 pb-12">
+        {isOpenGroup && (
+          <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <span className="material-symbols-outlined text-purple-500 text-[20px]">science</span>
+            <p className="text-sm text-purple-700">
+              <span className="font-semibold">Demo group</span> — anyone can manage events here. No passcode required.
+            </p>
+          </div>
+        )}
+
         {!snapshot ? (
           <div className="pt-2">
             <CreateEventForm token={activePasscode!} onCreated={fetchData} groupSlug={groupSlug} />
@@ -226,7 +240,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               </>
             )}
 
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1">
               <SummaryPanel snapshot={snapshot} />
               {snapshot.event.status === "open" && (
                 <FinalizeControls
@@ -238,7 +252,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               )}
             </div>
 
-            <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+            <div className="grid gap-6 grid-cols-1">
               <AdminLocationManager
                 locations={snapshot.locations}
                 eventId={snapshot.event.id}
@@ -262,8 +276,8 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           </>
         )}
 
-        {/* Change Passcode Section */}
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+        {/* Change Passcode Section — hidden for open/demo groups */}
+        {!isOpenGroup && <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Change Passcode</h3>
           <div className="flex gap-2">
             <input
@@ -284,7 +298,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               {changingPasscode ? "..." : "Update"}
             </button>
           </div>
-        </div>
+        </div>}
       </main>
     </>
   );

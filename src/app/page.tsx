@@ -63,7 +63,7 @@ export default function LandingPage() {
         }),
       });
       if (res.ok) {
-        router.push(`/g/${groupSlug}`);
+        router.push(`/g/${groupSlug}/admin?new=1`);
       } else {
         const data = await res.json();
         setCreateError(data.error || "Failed to create group");

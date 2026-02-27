@@ -15,6 +15,7 @@ export const CreateLocationInput = z.object({
   name: z.string().min(1),
   address: z.string().optional(),
   mapsUrl: z.string().optional(),
+  placeId: z.string().optional(),
 });
 
 export const EventSchema = z.object({

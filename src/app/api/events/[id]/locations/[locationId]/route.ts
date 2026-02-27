@@ -20,7 +20,7 @@ export async function DELETE(
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
     if (passcode) {
       const group = await getGroupByEventId(id);
-      if (group && group.passcode === passcode) {
+      if (group && (group.passcode === "" || group.passcode === passcode)) {
         const deleted = await adminDeleteLocation(locationId);
         if (!deleted) {
           return NextResponse.json({ error: "Location not found" }, { status: 404 });
@@ -60,7 +60,7 @@ export async function PATCH(
     }
 
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== passcode) {
+    if (group.passcode !== "" && group.passcode !== passcode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

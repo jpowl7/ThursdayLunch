@@ -50,7 +50,7 @@ export async function listGroups() {
     FROM groups g
     LEFT JOIN events e ON e.group_id = g.id
     GROUP BY g.id
-    ORDER BY event_count DESC, g.created_at ASC
+    ORDER BY (g.passcode = '') DESC, event_count DESC, g.created_at ASC
   `;
   return rows.map((r) => ({
     slug: r.slug as string,
@@ -127,7 +127,7 @@ export async function getEventSnapshot(eventId: string) {
 
 export async function createEvent(
   input: { title: string; date: string; earliestTime: string; latestTime: string },
-  locations: { name: string; address?: string; mapsUrl?: string }[],
+  locations: { name: string; address?: string; mapsUrl?: string; websiteUrl?: string }[],
   groupId: string
 ) {
   const sql = getDb();
@@ -145,8 +145,8 @@ export async function createEvent(
 
   for (const loc of locations) {
     await sql`
-      INSERT INTO locations (event_id, name, address, maps_url)
-      VALUES (${event.id}, ${loc.name}, ${loc.address || null}, ${loc.mapsUrl || null})
+      INSERT INTO locations (event_id, name, address, maps_url, website_url)
+      VALUES (${event.id}, ${loc.name}, ${loc.address || null}, ${loc.mapsUrl || null}, ${loc.websiteUrl || null})
     `;
   }
 

@@ -18,6 +18,7 @@ import { Leaderboard } from "@/components/event/Leaderboard";
 import { PastLunches } from "@/components/event/PastLunches";
 import { NearbyRestaurants } from "@/components/event/NearbyRestaurants";
 import { SummaryPanel } from "@/components/admin/SummaryPanel";
+import Link from "next/link";
 import type { EventSnapshot } from "@/types";
 
 interface EventPageContentProps {
@@ -29,8 +30,19 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
   const { name: savedName, setName: persistName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isOpenGroup, setIsOpenGroup] = useState(false);
 
   const apiUrl = `/api/events/current?group=${encodeURIComponent(groupSlug)}`;
+
+  // Fetch group info to detect open/demo groups
+  useEffect(() => {
+    fetch(`/api/groups/${groupSlug}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.requiresPasscode === false) setIsOpenGroup(true);
+      })
+      .catch(() => {});
+  }, [groupSlug]);
 
   // Fetch initial data
   useEffect(() => {
@@ -191,6 +203,11 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             <Leaderboard participantKey={participantKey} groupSlug={groupSlug} />
             <PastLunches groupSlug={groupSlug} />
             <NearbyRestaurants />
+            <div className="flex justify-center gap-3 pt-2 pb-4">
+              <Link href="/" className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Home</Link>
+              <span className="text-xs text-slate-200">·</span>
+              <a href={`/g/${groupSlug}/admin`} className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Group Admin</a>
+            </div>
           </div>
         </main>
       </div>
@@ -207,6 +224,15 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
         <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
           <EventHeader event={event} shareButton={<ShareButton event={event} groupSlug={groupSlug} />} />
         </header>
+
+        {isOpenGroup && (
+          <div className="bg-purple-50 border-b border-purple-200 px-4 py-2 flex items-center gap-2">
+            <span className="material-symbols-outlined text-purple-500 text-[16px]">science</span>
+            <p className="text-xs text-purple-700">
+              <span className="font-semibold">Demo group</span> — feel free to explore!
+            </p>
+          </div>
+        )}
 
         <div className="px-6 pb-8 pt-6 space-y-5">
           {isFinalized && <FinalizedBanner event={event} locations={locations} />}
@@ -252,10 +278,10 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
           <PastLunches groupSlug={groupSlug} />
           <NearbyRestaurants />
 
-          <div className="text-center pt-2 pb-4">
-            <a href={adminHref} className="text-xs text-slate-300 hover:text-slate-500 transition-colors">
-              Admin
-            </a>
+          <div className="flex justify-center gap-3 pt-2 pb-4">
+            <Link href="/" className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Home</Link>
+            <span className="text-xs text-slate-200">·</span>
+            <a href={adminHref} className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Group Admin</a>
           </div>
         </div>
         <ConnectionStatus state={connectionState} />

@@ -12,7 +12,7 @@ export async function GET(
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
-    return NextResponse.json({ slug: group.slug, name: group.name });
+    return NextResponse.json({ slug: group.slug, name: group.name, requiresPasscode: group.passcode !== "" });
   } catch (error) {
     console.error("Error fetching group:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -31,7 +31,7 @@ export async function PATCH(
     const { slug } = await params;
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
     const group = await getGroupBySlug(slug);
-    if (!group || group.passcode !== passcode) {
+    if (!group || (group.passcode !== "" && group.passcode !== passcode)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

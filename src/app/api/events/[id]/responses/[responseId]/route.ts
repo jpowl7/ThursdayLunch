@@ -14,7 +14,7 @@ export async function DELETE(
     }
 
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== passcode) {
+    if (group.passcode !== "" && group.passcode !== passcode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -47,7 +47,7 @@ export async function PATCH(
     }
 
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== passcode) {
+    if (group.passcode !== "" && group.passcode !== passcode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -1,14 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import type { Location, Response } from "@/lib/schemas";
+import { PlacesAutocomplete } from "@/components/PlacesAutocomplete";
 import { toast } from "sonner";
-
-interface PlaceSuggestion {
-  placeId: string;
-  mainText: string;
-  secondaryText: string;
-}
 
 interface LocationVotingProps {
   locations: Location[];
@@ -38,63 +33,13 @@ export function LocationVoting({
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const suggestionsRef = useRef<HTMLDivElement>(null);
 
   // Duplicate check
   const isDuplicate = newName.trim().length > 0 && locations.some(
     (loc) => loc.name.toLowerCase() === newName.trim().toLowerCase()
   );
-
-  // Fetch autocomplete suggestions
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-
-    if (newName.trim().length < 2 || selectedPlaceId) {
-      setSuggestions([]);
-      return;
-    }
-
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `/api/places/autocomplete?input=${encodeURIComponent(newName.trim())}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setSuggestions(data);
-          setShowSuggestions(data.length > 0);
-        }
-      } catch {
-        // ignore
-      }
-    }, 300);
-
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [newName, selectedPlaceId]);
-
-  // Close suggestions on outside click
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (
-        suggestionsRef.current &&
-        !suggestionsRef.current.contains(e.target as Node) &&
-        inputRef.current &&
-        !inputRef.current.contains(e.target as Node)
-      ) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   // Count votes and preferences per location
   const voteCounts = new Map<string, number>();
@@ -122,17 +67,9 @@ export function LocationVoting({
     (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
   );
 
-  const selectSuggestion = (s: PlaceSuggestion) => {
-    setNewName(s.mainText);
-    setSelectedPlaceId(s.placeId);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    inputRef.current?.focus();
-  };
-
-  const handleInputChange = (value: string) => {
-    setNewName(value);
-    setSelectedPlaceId(null); // Clear selection when user edits
+  const handlePlaceChange = (name: string, placeId: string | null) => {
+    setNewName(name);
+    setSelectedPlaceId(placeId);
   };
 
   const handleAddLocation = async () => {
@@ -153,7 +90,6 @@ export function LocationVoting({
         const added = await res.json();
         setNewName("");
         setSelectedPlaceId(null);
-        setSuggestions([]);
         if (added?.id) {
           setRecentlyAdded((prev) => new Set(prev).add(added.id));
           setTimeout(() => {
@@ -337,33 +273,23 @@ export function LocationVoting({
 
       {/* Suggest a place */}
       {eventId && !disabled && (
-        <div className="relative">
+        <div>
           <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={newName}
-              onChange={(e) => handleInputChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setShowSuggestions(false);
-                  handleAddLocation();
-                }
-              }}
-              onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-              placeholder="Suggest a place…"
-              className={`flex-1 min-w-0 px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
-                isDuplicate
-                  ? "border-red-300 focus:border-red-400 focus:ring-red-400"
-                  : "border-slate-200 focus:border-orange-400 focus:ring-orange-400"
-              }`}
-            />
+            <div className="flex-1 min-w-0">
+              <PlacesAutocomplete
+                value={newName}
+                onChange={handlePlaceChange}
+                placeholder="Suggest a place…"
+                inputClassName={`w-full px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
+                  isDuplicate
+                    ? "border-red-300 focus:border-red-400 focus:ring-red-400"
+                    : "border-slate-200 focus:border-orange-400 focus:ring-orange-400"
+                }`}
+              />
+            </div>
             <button
               type="button"
-              onClick={() => {
-                setShowSuggestions(false);
-                handleAddLocation();
-              }}
+              onClick={handleAddLocation}
               disabled={adding || !newName.trim() || isDuplicate}
               className="px-3 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 disabled:cursor-default transition-colors"
             >
@@ -374,26 +300,6 @@ export function LocationVoting({
           {/* Duplicate warning */}
           {isDuplicate && (
             <p className="text-xs text-red-500 mt-1 ml-1">Already on the list</p>
-          )}
-
-          {/* Autocomplete dropdown */}
-          {showSuggestions && suggestions.length > 0 && (
-            <div
-              ref={suggestionsRef}
-              className="absolute left-0 right-12 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-30 overflow-hidden"
-            >
-              {suggestions.map((s) => (
-                <button
-                  key={s.placeId}
-                  type="button"
-                  onClick={() => selectSuggestion(s)}
-                  className="w-full text-left px-3 py-2 hover:bg-orange-50 transition-colors border-b border-slate-50 last:border-b-0"
-                >
-                  <p className="text-sm font-semibold text-slate-800 truncate">{s.mainText}</p>
-                  <p className="text-xs text-slate-400 truncate">{s.secondaryText}</p>
-                </button>
-              ))}
-            </div>
           )}
         </div>
       )}

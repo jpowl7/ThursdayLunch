@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { PlacesAutocomplete } from "@/components/PlacesAutocomplete";
 
 interface CreateEventFormProps {
   token: string;
@@ -11,8 +12,7 @@ interface CreateEventFormProps {
 
 interface LocationInput {
   name: string;
-  address: string;
-  mapsUrl: string;
+  placeId: string | null;
 }
 
 export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventFormProps) {
@@ -21,22 +21,22 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const [earliestTime, setEarliestTime] = useState("11:30");
   const [latestTime, setLatestTime] = useState("13:30");
   const [locations, setLocations] = useState<LocationInput[]>([
-    { name: "", address: "", mapsUrl: "" },
+    { name: "", placeId: null },
   ]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const addLocation = () => {
-    setLocations([...locations, { name: "", address: "", mapsUrl: "" }]);
+    setLocations([...locations, { name: "", placeId: null }]);
   };
 
   const removeLocation = (index: number) => {
     setLocations(locations.filter((_, i) => i !== index));
   };
 
-  const updateLocation = (index: number, field: keyof LocationInput, value: string) => {
+  const updateLocation = (index: number, name: string, placeId: string | null) => {
     const updated = [...locations];
-    updated[index] = { ...updated[index], [field]: value };
+    updated[index] = { name, placeId };
     setLocations(updated);
   };
 
@@ -67,8 +67,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           groupSlug,
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
-            address: l.address.trim() || undefined,
-            mapsUrl: l.mapsUrl.trim() || undefined,
+            placeId: l.placeId || undefined,
           })),
         }),
       });
@@ -92,7 +91,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   return (
     <div className="bg-white rounded-xl p-6 border border-orange-500/10 shadow-sm">
       <h2 className="text-xl font-bold mb-1">Create New Event</h2>
-      <p className="text-slate-400 text-sm mb-6">Set up a new lunch for the group</p>
+      <p className="text-slate-400 text-sm mb-6">Set up a new event for the group</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -154,23 +153,11 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
                   </button>
                 )}
               </div>
-              <input
+              <PlacesAutocomplete
                 value={loc.name}
-                onChange={(e) => updateLocation(i, "name", e.target.value)}
-                placeholder="Restaurant name"
-                className={inputClass}
-              />
-              <input
-                value={loc.address}
-                onChange={(e) => updateLocation(i, "address", e.target.value)}
-                placeholder="Address (optional)"
-                className={inputClass}
-              />
-              <input
-                value={loc.mapsUrl}
-                onChange={(e) => updateLocation(i, "mapsUrl", e.target.value)}
-                placeholder="Google Maps URL (optional)"
-                className={inputClass}
+                onChange={(name, placeId) => updateLocation(i, name, placeId)}
+                placeholder="Search for a restaurant…"
+                inputClassName={inputClass}
               />
             </div>
           ))}
