@@ -5,7 +5,7 @@ import type { EventSnapshot } from "@/types";
 
 type ConnectionState = "connecting" | "connected" | "polling" | "disconnected";
 
-export function useEventStream(eventId: string | null, isDev = false) {
+export function useEventStream(eventId: string | null, groupSlug: string) {
   const [snapshot, setSnapshot] = useState<EventSnapshot | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
   const eventSourceRef = useRef<EventSource | null>(null);
@@ -13,7 +13,7 @@ export function useEventStream(eventId: string | null, isDev = false) {
 
   const fetchSnapshot = useCallback(async () => {
     try {
-      const res = await fetch(`/api/events/current${isDev ? "?dev=true" : ""}`);
+      const res = await fetch(`/api/events/current?group=${encodeURIComponent(groupSlug)}`);
       if (res.ok) {
         const data = await res.json();
         setSnapshot(data);
@@ -21,7 +21,7 @@ export function useEventStream(eventId: string | null, isDev = false) {
     } catch {
       // ignore fetch errors during polling
     }
-  }, [isDev]);
+  }, [groupSlug]);
 
   const startPolling = useCallback(() => {
     if (pollingRef.current) return;

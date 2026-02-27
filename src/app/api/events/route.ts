@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CreateEventSchema } from "@/lib/schemas";
-import { createEvent } from "@/lib/db/queries";
+import { createEvent, getGroupBySlug } from "@/lib/db/queries";
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,17 +10,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const { locations, isDev, ...eventInput } = parsed.data;
+    const { locations, groupSlug, ...eventInput } = parsed.data;
 
-    // Dev sandbox doesn't require auth; prod does
-    if (!isDev) {
-      const token = request.headers.get("authorization")?.replace("Bearer ", "");
-      if (token !== process.env.ADMIN_TOKEN) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    const group = await getGroupBySlug(groupSlug);
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const snapshot = await createEvent(eventInput, locations, isDev ?? false);
+    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
+    if (group.passcode !== passcode) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const snapshot = await createEvent(eventInput, locations, group.id);
     return NextResponse.json(snapshot, { status: 201 });
   } catch (error) {
     console.error("Error creating event:", error);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DeleteLocationSchema, RenameLocationSchema } from "@/lib/schemas";
-import { deleteLocation, adminDeleteLocation, updateLocationName, getEventById } from "@/lib/db/queries";
+import { deleteLocation, adminDeleteLocation, updateLocationName, getEventById, getGroupByEventId } from "@/lib/db/queries";
 
 export async function DELETE(
   request: NextRequest,
@@ -17,13 +17,16 @@ export async function DELETE(
     }
 
     // Admin delete (Bearer token) — can delete any location
-    const token = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (token && token === process.env.ADMIN_TOKEN) {
-      const deleted = await adminDeleteLocation(locationId);
-      if (!deleted) {
-        return NextResponse.json({ error: "Location not found" }, { status: 404 });
+    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
+    if (passcode) {
+      const group = await getGroupByEventId(id);
+      if (group && group.passcode === passcode) {
+        const deleted = await adminDeleteLocation(locationId);
+        if (!deleted) {
+          return NextResponse.json({ error: "Location not found" }, { status: 404 });
+        }
+        return NextResponse.json({ success: true });
       }
-      return NextResponse.json({ success: true });
     }
 
     // Participant delete — can only delete own locations
@@ -49,13 +52,17 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; locationId: string }> }
 ) {
-  const token = request.headers.get("authorization")?.replace("Bearer ", "");
-  if (token !== process.env.ADMIN_TOKEN) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
-    const { locationId } = await params;
+    const { id, locationId } = await params;
+    const group = await getGroupByEventId(id);
+    if (!group) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
+    if (group.passcode !== passcode) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
     const body = await request.json();
     const parsed = RenameLocationSchema.safeParse(body);

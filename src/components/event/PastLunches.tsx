@@ -26,20 +26,20 @@ function formatTime(time: string | null): string {
   return `${displayH}:${m.toString().padStart(2, "0")} ${period}`;
 }
 
-export function PastLunches() {
+export function PastLunches({ groupSlug }: { groupSlug: string }) {
   const [lunches, setLunches] = useState<PastLunch[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    fetch("/api/lunches")
+    fetch(`/api/lunches?group=${encodeURIComponent(groupSlug)}`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         setLunches(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [groupSlug]);
 
   if (loading || lunches.length === 0) return null;
 

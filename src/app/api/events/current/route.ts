@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentEvent, getEventSnapshot } from "@/lib/db/queries";
+import { getCurrentEvent, getEventSnapshot, getGroupBySlug } from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   try {
-    const isDev = request.nextUrl.searchParams.get("dev") === "true";
-    const event = await getCurrentEvent(isDev);
+    const groupSlug = request.nextUrl.searchParams.get("group");
+    if (!groupSlug) {
+      return NextResponse.json({ error: "Missing group parameter" }, { status: 400 });
+    }
+
+    const group = await getGroupBySlug(groupSlug);
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+
+    const event = await getCurrentEvent(group.id);
     if (!event) {
       return NextResponse.json({ error: "No open event found" }, { status: 404 });
     }

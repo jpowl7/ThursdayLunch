@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   getFinalizedEventCount,
   getLeaderboardAttendance,
@@ -8,6 +8,7 @@ import {
   getLeaderboardSpeedDemon,
   getLeaderboardFashionablyLate,
   getLeaderboardTrendsetter,
+  getGroupBySlug,
 } from "@/lib/db/queries";
 
 function mapEntries(rows: Record<string, unknown>[]) {
@@ -18,18 +19,28 @@ function mapEntries(rows: Record<string, unknown>[]) {
   }));
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const groupSlug = request.nextUrl.searchParams.get("group");
+    if (!groupSlug) {
+      return NextResponse.json({ error: "Missing group parameter" }, { status: 400 });
+    }
+
+    const group = await getGroupBySlug(groupSlug);
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+
     const [totalEvents, attendance, tastemaker, firstResponder, streaks, speedDemon, fashionablyLate, trendsetter] =
       await Promise.all([
-        getFinalizedEventCount(),
-        getLeaderboardAttendance(),
-        getLeaderboardTastemaker(),
-        getLeaderboardFirstResponder(),
-        getLeaderboardStreaks(),
-        getLeaderboardSpeedDemon(),
-        getLeaderboardFashionablyLate(),
-        getLeaderboardTrendsetter(),
+        getFinalizedEventCount(group.id),
+        getLeaderboardAttendance(group.id),
+        getLeaderboardTastemaker(group.id),
+        getLeaderboardFirstResponder(group.id),
+        getLeaderboardStreaks(group.id),
+        getLeaderboardSpeedDemon(group.id),
+        getLeaderboardFashionablyLate(group.id),
+        getLeaderboardTrendsetter(group.id),
       ]);
 
     return NextResponse.json({

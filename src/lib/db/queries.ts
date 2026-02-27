@@ -1,8 +1,83 @@
 import { getDb } from "./client";
 
-export async function getCurrentEvent(isDev = false) {
+// ── Group queries ──────────────────────────────────────────
+
+export async function createGroup(slug: string, name: string, passcode: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND is_dev = ${isDev} ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`
+    INSERT INTO groups (slug, name, passcode)
+    VALUES (${slug}, ${name}, ${passcode})
+    RETURNING *
+  `;
+  return mapGroup(rows[0]);
+}
+
+export async function getGroupBySlug(slug: string) {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM groups WHERE slug = ${slug}`;
+  return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+export async function verifyGroupPasscode(slug: string, passcode: string) {
+  const group = await getGroupBySlug(slug);
+  return group && group.passcode === passcode;
+}
+
+export async function updateGroupPasscode(groupId: string, newPasscode: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE groups SET passcode = ${newPasscode}
+    WHERE id = ${groupId}
+    RETURNING *
+  `;
+  return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+export async function getGroupByEventId(eventId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT g.* FROM groups g
+    JOIN events e ON e.group_id = g.id
+    WHERE e.id = ${eventId}
+  `;
+  return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+// ── Participant queries ────────────────────────────────────
+
+export async function createParticipant(name: string, pin: string, participantKey: string) {
+  const sql = getDb();
+  const rows = await sql`
+    INSERT INTO participants (name, pin, participant_key)
+    VALUES (${name}, ${pin}, ${participantKey})
+    RETURNING *
+  `;
+  return mapParticipant(rows[0]);
+}
+
+export async function loginParticipant(name: string, pin: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM participants
+    WHERE name = ${name} AND pin = ${pin}
+  `;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+export async function getParticipantByKey(participantKey: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM participants
+    WHERE participant_key = ${participantKey}
+  `;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+// ── Event queries ──────────────────────────────────────────
+
+export async function getCurrentEvent(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} ORDER BY created_at DESC LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -37,16 +112,16 @@ export async function getEventSnapshot(eventId: string) {
 export async function createEvent(
   input: { title: string; date: string; earliestTime: string; latestTime: string },
   locations: { name: string; address?: string; mapsUrl?: string }[],
-  isDev = false
+  groupId: string
 ) {
   const sql = getDb();
 
-  // Close any open events in the same mode (dev or prod)
-  await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open' AND is_dev = ${isDev}`;
+  // Close any open events in the same group
+  await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open' AND group_id = ${groupId}`;
 
   const eventRows = await sql`
-    INSERT INTO events (title, date, earliest_time, latest_time, is_dev)
-    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${isDev})
+    INSERT INTO events (title, date, earliest_time, latest_time, group_id)
+    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId})
     RETURNING *
   `;
 
@@ -211,13 +286,13 @@ export async function reopenEvent(id: string) {
 
 // ── Leaderboard queries ──────────────────────────────────────
 
-export async function getPastLunches(limit = 10) {
+export async function getPastLunches(groupId: string, limit = 10) {
   const sql = getDb();
   const events = await sql`
     SELECT e.*, l.name AS location_name, l.address AS location_address, l.maps_url AS location_maps_url
     FROM events e
     LEFT JOIN locations l ON l.id = e.chosen_location_id
-    WHERE e.status = 'finalized'
+    WHERE e.status = 'finalized' AND e.group_id = ${groupId}
     ORDER BY e.date DESC
     LIMIT ${limit}
   `;
@@ -250,20 +325,20 @@ export async function getPastLunches(limit = 10) {
   }));
 }
 
-export async function getFinalizedEventCount(): Promise<number> {
+export async function getFinalizedEventCount(groupId: string): Promise<number> {
   const sql = getDb();
-  const rows = await sql`SELECT COUNT(*)::int AS count FROM events WHERE status = 'finalized'`;
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM events WHERE status = 'finalized' AND group_id = ${groupId}`;
   return rows[0].count;
 }
 
-export async function getLeaderboardAttendance() {
+export async function getLeaderboardAttendance(groupId: string) {
   const sql = getDb();
   return sql`
     SELECT r.participant_key,
            latest_name.name,
            COUNT(*)::int AS count
     FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
     JOIN LATERAL (
       SELECT r2.name FROM responses r2
       WHERE r2.participant_key = r.participant_key
@@ -276,14 +351,14 @@ export async function getLeaderboardAttendance() {
   `;
 }
 
-export async function getLeaderboardTastemaker() {
+export async function getLeaderboardTastemaker(groupId: string) {
   const sql = getDb();
   return sql`
     SELECT r.participant_key,
            latest_name.name,
            COUNT(*)::int AS count
     FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
     JOIN LATERAL (
       SELECT r2.name FROM responses r2
       WHERE r2.participant_key = r.participant_key
@@ -298,14 +373,14 @@ export async function getLeaderboardTastemaker() {
   `;
 }
 
-export async function getLeaderboardFirstResponder() {
+export async function getLeaderboardFirstResponder(groupId: string) {
   const sql = getDb();
   return sql`
     WITH first_responders AS (
       SELECT DISTINCT ON (r.event_id)
              r.participant_key
       FROM responses r
-      JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
       WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at
     )
@@ -324,26 +399,23 @@ export async function getLeaderboardFirstResponder() {
   `;
 }
 
-export async function getLeaderboardStreaks() {
+export async function getLeaderboardStreaks(groupId: string) {
   const sql = getDb();
-  // Get finalized events ordered newest-first, then compute streaks in JS
   const events = await sql`
     SELECT e.id
     FROM events e
-    WHERE e.status = 'finalized'
+    WHERE e.status = 'finalized' AND e.group_id = ${groupId}
     ORDER BY e.date DESC
   `;
   if (events.length === 0) return [];
 
-  // Get all attendees for finalized events
+  const eventIds = events.map((e) => e.id as string);
   const attendees = await sql`
     SELECT r.event_id, r.participant_key
     FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
-    WHERE r.status = 'in'
+    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in'
   `;
 
-  // Build set of attendees per event
   const eventAttendees = new Map<string, Set<string>>();
   for (const row of attendees) {
     const eventId = row.event_id as string;
@@ -352,11 +424,9 @@ export async function getLeaderboardStreaks() {
     eventAttendees.get(eventId)!.add(pk);
   }
 
-  // Collect all participant keys
   const allParticipants = new Set<string>();
   for (const row of attendees) allParticipants.add(row.participant_key as string);
 
-  // Walk events newest-first, compute streak per participant
   const streaks = new Map<string, number>();
   for (const pk of allParticipants) {
     let streak = 0;
@@ -373,12 +443,10 @@ export async function getLeaderboardStreaks() {
 
   if (streaks.size === 0) return [];
 
-  // Sort by streak desc, take top 10
   const sorted = [...streaks.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  // Get names
   const keys = sorted.map((s) => s[0]);
   const names = await sql`
     SELECT DISTINCT ON (participant_key) participant_key, name
@@ -395,14 +463,14 @@ export async function getLeaderboardStreaks() {
   }));
 }
 
-export async function getLeaderboardSpeedDemon() {
+export async function getLeaderboardSpeedDemon(groupId: string) {
   const sql = getDb();
   return sql`
     SELECT r.participant_key,
            latest_name.name,
            COUNT(*)::int AS count
     FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
     JOIN LATERAL (
       SELECT r2.name FROM responses r2
       WHERE r2.participant_key = r.participant_key
@@ -416,14 +484,14 @@ export async function getLeaderboardSpeedDemon() {
   `;
 }
 
-export async function getLeaderboardFashionablyLate() {
+export async function getLeaderboardFashionablyLate(groupId: string) {
   const sql = getDb();
   return sql`
     WITH last_responders AS (
       SELECT DISTINCT ON (r.event_id)
              r.participant_key
       FROM responses r
-      JOIN events e ON e.id = r.event_id AND e.status = 'finalized'
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
       WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at DESC
     )
@@ -442,7 +510,7 @@ export async function getLeaderboardFashionablyLate() {
   `;
 }
 
-export async function getLeaderboardTrendsetter() {
+export async function getLeaderboardTrendsetter(groupId: string) {
   const sql = getDb();
   return sql`
     WITH first_voters AS (
@@ -453,6 +521,7 @@ export async function getLeaderboardTrendsetter() {
       JOIN location_votes lv ON lv.response_id = r.id AND lv.location_id = e.chosen_location_id
       WHERE e.status = 'finalized'
         AND e.chosen_location_id IS NOT NULL
+        AND e.group_id = ${groupId}
       ORDER BY e.id, lv.created_at ASC
     )
     SELECT fv.participant_key,
@@ -470,7 +539,8 @@ export async function getLeaderboardTrendsetter() {
   `;
 }
 
-// Row mappers (snake_case DB columns -> camelCase)
+// ── Row mappers ──────────────────────────────────────────────
+
 function mapEvent(row: Record<string, unknown>) {
   return {
     id: row.id as string,
@@ -481,6 +551,7 @@ function mapEvent(row: Record<string, unknown>) {
     status: row.status as "open" | "finalized" | "cancelled",
     chosenTime: row.chosen_time ? normalizeTime(row.chosen_time) : null,
     chosenLocationId: row.chosen_location_id ? String(row.chosen_location_id) : null,
+    groupId: row.group_id as string,
     createdAt: String(row.created_at),
   };
 }
@@ -524,5 +595,25 @@ function mapResponse(row: Record<string, unknown>) {
     preferredLocationId: row.preferred_location_id ? String(row.preferred_location_id) : null,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+  };
+}
+
+function mapGroup(row: Record<string, unknown>) {
+  return {
+    id: row.id as string,
+    slug: row.slug as string,
+    name: row.name as string,
+    passcode: row.passcode as string,
+    createdAt: String(row.created_at),
+  };
+}
+
+function mapParticipant(row: Record<string, unknown>) {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    pin: row.pin as string,
+    participantKey: row.participant_key as string,
+    createdAt: String(row.created_at),
   };
 }

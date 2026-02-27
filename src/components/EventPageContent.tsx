@@ -21,16 +21,16 @@ import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import type { EventSnapshot } from "@/types";
 
 interface EventPageContentProps {
-  isDev?: boolean;
+  groupSlug: string;
 }
 
-export function EventPageContent({ isDev = false }: EventPageContentProps) {
-  const participantKey = useParticipantKey();
+export function EventPageContent({ groupSlug }: EventPageContentProps) {
+  const { key: participantKey } = useParticipantKey();
   const { name: savedName, setName: persistName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const apiUrl = `/api/events/current${isDev ? "?dev=true" : ""}`;
+  const apiUrl = `/api/events/current?group=${encodeURIComponent(groupSlug)}`;
 
   // Fetch initial data
   useEffect(() => {
@@ -44,7 +44,7 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
   }, [apiUrl]);
 
   const eventId = initialSnapshot?.event?.id || null;
-  const { snapshot: liveSnapshot, connectionState, refresh } = useEventStream(eventId, isDev);
+  const { snapshot: liveSnapshot, connectionState, refresh } = useEventStream(eventId, groupSlug);
   const snapshot = liveSnapshot || initialSnapshot;
 
   useSnapshotNotifications(snapshot, participantKey);
@@ -180,11 +180,6 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
     return (
       <div className="flex justify-center min-h-screen">
         <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
-          {isDev && (
-            <div className="bg-purple-600 text-white text-center text-xs font-bold py-1 tracking-wider uppercase">
-              Dev Sandbox
-            </div>
-          )}
           <div className="flex items-center justify-center py-24">
             <div className="text-center">
               <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
@@ -192,13 +187,11 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
               <p className="text-slate-400">Check back later!</p>
             </div>
           </div>
-          {!isDev && (
-            <div className="px-6 pb-8 space-y-5">
-              <Leaderboard participantKey={participantKey} />
-              <PastLunches />
-              <NearbyRestaurants />
-            </div>
-          )}
+          <div className="px-6 pb-8 space-y-5">
+            <Leaderboard participantKey={participantKey} groupSlug={groupSlug} />
+            <PastLunches groupSlug={groupSlug} />
+            <NearbyRestaurants />
+          </div>
         </main>
       </div>
     );
@@ -206,18 +199,13 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
 
   const { event, locations, responses } = snapshot;
   const isFinalized = event.status === "finalized";
-  const adminHref = isDev ? "/dev/admin" : "/admin";
+  const adminHref = `/g/${groupSlug}/admin`;
 
   return (
     <div className="flex justify-center min-h-screen">
       <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
-        {isDev && (
-          <div className="bg-purple-600 text-white text-center text-xs font-bold py-1 tracking-wider uppercase">
-            Dev Sandbox
-          </div>
-        )}
         <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
-          <EventHeader event={event} shareButton={<ShareButton event={event} />} />
+          <EventHeader event={event} shareButton={<ShareButton event={event} groupSlug={groupSlug} />} />
         </header>
 
         <div className="px-6 pb-8 pt-6 space-y-5">
@@ -260,13 +248,9 @@ export function EventPageContent({ isDev = false }: EventPageContentProps) {
 
           <AttendeeList responses={responses} locations={locations} currentParticipantKey={participantKey} />
 
-          {!isDev && (
-            <>
-              <Leaderboard participantKey={participantKey} />
-              <PastLunches />
-              <NearbyRestaurants />
-            </>
-          )}
+          <Leaderboard participantKey={participantKey} groupSlug={groupSlug} />
+          <PastLunches groupSlug={groupSlug} />
+          <NearbyRestaurants />
 
           <div className="text-center pt-2 pb-4">
             <a href={adminHref} className="text-xs text-slate-300 hover:text-slate-500 transition-colors">

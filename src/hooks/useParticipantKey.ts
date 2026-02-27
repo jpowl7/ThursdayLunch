@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const STORAGE_KEY = "thursday-lunch-participant-key";
 
@@ -9,7 +9,7 @@ function generateKey(): string {
 }
 
 export function useParticipantKey() {
-  const [key, setKey] = useState<string | null>(null);
+  const [key, setKeyState] = useState<string | null>(null);
 
   useEffect(() => {
     let stored = localStorage.getItem(STORAGE_KEY);
@@ -17,8 +17,13 @@ export function useParticipantKey() {
       stored = generateKey();
       localStorage.setItem(STORAGE_KEY, stored);
     }
-    setKey(stored);
+    setKeyState(stored);
   }, []);
 
-  return key;
+  const setParticipantKey = useCallback((newKey: string) => {
+    localStorage.setItem(STORAGE_KEY, newKey);
+    setKeyState(newKey);
+  }, []);
+
+  return { key, setParticipantKey };
 }

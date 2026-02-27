@@ -28,3 +28,19 @@ export interface LeaderboardData {
   fashionablyLate: LeaderboardEntry[];
   trendsetter: LeaderboardEntry[];
 }
+
+export interface Group {
+  id: string;
+  slug: string;
+  name: string;
+  passcode: string;
+  createdAt: string;
+}
+
+export interface Participant {
+  id: string;
+  name: string;
+  pin: string;
+  participantKey: string;
+  createdAt: string;
+}

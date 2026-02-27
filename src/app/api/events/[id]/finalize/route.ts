@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { finalizeEvent, reopenEvent, getEventById } from "@/lib/db/queries";
+import { finalizeEvent, reopenEvent, getEventById, getGroupByEventId } from "@/lib/db/queries";
 
 const FinalizeSchema = z.object({
   chosenTime: z.string(),
@@ -11,13 +11,18 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const token = request.headers.get("authorization")?.replace("Bearer ", "");
-  if (token !== process.env.ADMIN_TOKEN) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { id } = await params;
+    const group = await getGroupByEventId(id);
+    if (!group) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
+    if (group.passcode !== passcode) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const event = await getEventById(id);
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
@@ -41,13 +46,18 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const token = request.headers.get("authorization")?.replace("Bearer ", "");
-  if (token !== process.env.ADMIN_TOKEN) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   try {
     const { id } = await params;
+    const group = await getGroupByEventId(id);
+    if (!group) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+
+    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
+    if (group.passcode !== passcode) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const event = await getEventById(id);
     if (!event) {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });

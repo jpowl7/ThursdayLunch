@@ -8,9 +8,10 @@ interface FinalizeControlsProps {
   snapshot: EventSnapshot;
   token: string;
   onFinalized: () => void;
+  groupSlug: string;
 }
 
-export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeControlsProps) {
+export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: FinalizeControlsProps) {
   const { event, locations, responses } = snapshot;
   const inResponses = responses.filter((r) => r.status === "in");
 
@@ -95,7 +96,7 @@ export function FinalizeControls({ snapshot, token, onFinalized }: FinalizeContr
     }
   };
 
-  const shareUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/g/${groupSlug}` : "";
 
   const handleCopyLink = async () => {
     try {

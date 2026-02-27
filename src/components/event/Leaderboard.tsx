@@ -4,9 +4,9 @@ import { useState, useEffect } from "react";
 import type { LeaderboardData, LeaderboardEntry } from "@/types";
 
 function rankLabel(index: number): string {
-  if (index === 0) return "🥇";
-  if (index === 1) return "🥈";
-  if (index === 2) return "🥉";
+  if (index === 0) return "\u{1F947}";
+  if (index === 1) return "\u{1F948}";
+  if (index === 2) return "\u{1F949}";
   return `${index + 1}`;
 }
 
@@ -66,15 +66,15 @@ function LeaderboardSection({
   );
 }
 
-export function Leaderboard({ participantKey }: { participantKey: string | null }) {
+export function Leaderboard({ participantKey, groupSlug }: { participantKey: string | null; groupSlug: string }) {
   const [data, setData] = useState<LeaderboardData | null>(null);
 
   useEffect(() => {
-    fetch("/api/leaderboard")
+    fetch(`/api/leaderboard?group=${encodeURIComponent(groupSlug)}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((json) => setData(json))
       .catch(() => {});
-  }, []);
+  }, [groupSlug]);
 
   if (!data || data.totalEvents === 0) return null;
 

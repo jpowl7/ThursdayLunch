@@ -5,11 +5,12 @@ import type { Event } from "@/lib/schemas";
 
 interface ShareButtonProps {
   event: Event;
+  groupSlug: string;
 }
 
-export function ShareButton({ event }: ShareButtonProps) {
+export function ShareButton({ event, groupSlug }: ShareButtonProps) {
   const handleShare = async () => {
-    const url = window.location.href;
+    const url = `${window.location.origin}/g/${groupSlug}`;
     const text = `Join us for lunch! ${event.title}`;
 
     if (navigator.share) {

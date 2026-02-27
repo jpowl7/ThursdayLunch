@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 interface CreateEventFormProps {
   token: string;
   onCreated: () => void;
-  isDev?: boolean;
+  groupSlug: string;
 }
 
 interface LocationInput {
@@ -15,7 +15,7 @@ interface LocationInput {
   mapsUrl: string;
 }
 
-export function CreateEventForm({ token, onCreated, isDev = false }: CreateEventFormProps) {
+export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventFormProps) {
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [earliestTime, setEarliestTime] = useState("11:30");
@@ -64,7 +64,7 @@ export function CreateEventForm({ token, onCreated, isDev = false }: CreateEvent
           date,
           earliestTime,
           latestTime,
-          ...(isDev && { isDev: true }),
+          groupSlug,
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             address: l.address.trim() || undefined,
@@ -92,7 +92,7 @@ export function CreateEventForm({ token, onCreated, isDev = false }: CreateEvent
   return (
     <div className="bg-white rounded-xl p-6 border border-orange-500/10 shadow-sm">
       <h2 className="text-xl font-bold mb-1">Create New Event</h2>
-      <p className="text-slate-400 text-sm mb-6">Set up a new Thursday lunch for the team</p>
+      <p className="text-slate-400 text-sm mb-6">Set up a new lunch for the group</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
