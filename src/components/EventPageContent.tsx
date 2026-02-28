@@ -242,6 +242,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             name={name}
             onToggle={handleToggle}
             disabled={isFinalized}
+            participantKey={participantKey ?? undefined}
           />
 
           {responses.length > 0 && (

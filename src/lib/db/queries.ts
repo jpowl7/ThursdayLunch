@@ -89,6 +89,17 @@ export async function getParticipantByKey(participantKey: string) {
   return rows[0] ? mapParticipant(rows[0]) : null;
 }
 
+export async function updateParticipantPin(participantKey: string, currentPin: string, newPin: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE participants
+    SET pin = ${newPin}
+    WHERE participant_key = ${participantKey} AND pin = ${currentPin}
+    RETURNING *
+  `;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
 // ── Event queries ──────────────────────────────────────────
 
 export async function getCurrentEvent(groupId: string) {

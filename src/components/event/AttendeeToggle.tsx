@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { toast } from "sonner";
 
 type Status = "in" | "out" | "maybe";
 
@@ -18,13 +19,19 @@ interface AttendeeToggleProps {
   name: string;
   onToggle: (status: Status, name: string) => void;
   disabled?: boolean;
+  participantKey?: string;
 }
 
-export function AttendeeToggle({ status, name, onToggle, disabled }: AttendeeToggleProps) {
+export function AttendeeToggle({ status, name, onToggle, disabled, participantKey }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
   const [pendingStatus, setPendingStatus] = useState<Status>("in");
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinLoading, setPinLoading] = useState(false);
 
   // Sync nameInput when name prop changes (e.g., from SSE)
   useEffect(() => {
@@ -62,6 +69,58 @@ export function AttendeeToggle({ status, name, onToggle, disabled }: AttendeeTog
   const handleEditName = () => {
     setNameInput(name);
     setShowNameDialog(true);
+  };
+
+  const handleOpenPinDialog = () => {
+    setCurrentPin("");
+    setNewPin("");
+    setPinError("");
+    setShowPinDialog(true);
+  };
+
+  const handlePinSubmit = async () => {
+    if (!participantKey) return;
+    if (!/^\d{4}$/.test(currentPin)) {
+      setPinError("PIN must be exactly 4 digits");
+      return;
+    }
+    if (!/^\d{4}$/.test(newPin)) {
+      setPinError("New PIN must be exactly 4 digits");
+      return;
+    }
+    if (currentPin === newPin) {
+      setPinError("New PIN must be different");
+      return;
+    }
+
+    setPinLoading(true);
+    setPinError("");
+
+    try {
+      const res = await fetch("/api/participants", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participantKey, currentPin, newPin }),
+      });
+
+      if (res.ok) {
+        setShowPinDialog(false);
+        toast.success("PIN updated!");
+      } else {
+        const data = await res.json();
+        if (res.status === 404) {
+          setPinError("No registered account found. Register a name + PIN first.");
+        } else if (res.status === 401) {
+          setPinError("Current PIN is incorrect");
+        } else {
+          setPinError(data.error || "Something went wrong");
+        }
+      }
+    } catch {
+      setPinError("Something went wrong, try again");
+    } finally {
+      setPinLoading(false);
+    }
   };
 
   return (
@@ -117,6 +176,13 @@ export function AttendeeToggle({ status, name, onToggle, disabled }: AttendeeTog
             >
               <span className="material-symbols-outlined text-[16px]">edit</span>
             </button>
+            <button
+              onClick={handleOpenPinDialog}
+              className="text-orange-500 hover:text-orange-600 transition-colors"
+              title="Change PIN"
+            >
+              <span className="material-symbols-outlined text-[16px]">key</span>
+            </button>
           </div>
         )}
       </div>
@@ -164,6 +230,52 @@ export function AttendeeToggle({ status, name, onToggle, disabled }: AttendeeTog
               onClick={handleConfirm}
             >
               {pendingStatus === "maybe" ? "I\u0027m a maybe" : "I\u0027m out"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change PIN</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="current-pin">Current PIN</Label>
+              <Input
+                id="current-pin"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={currentPin}
+                onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Enter current 4-digit PIN"
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-pin">New PIN</Label>
+              <Input
+                id="new-pin"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={newPin}
+                onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Enter new 4-digit PIN"
+                onKeyDown={(e) => e.key === "Enter" && handlePinSubmit()}
+              />
+            </div>
+            {pinError && (
+              <p className="text-sm text-red-500">{pinError}</p>
+            )}
+            <Button
+              onClick={handlePinSubmit}
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              disabled={pinLoading || currentPin.length !== 4 || newPin.length !== 4}
+            >
+              {pinLoading ? "Updating..." : "Update PIN"}
             </Button>
           </div>
         </DialogContent>
