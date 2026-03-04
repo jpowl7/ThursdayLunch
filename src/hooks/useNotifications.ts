@@ -31,19 +31,49 @@ export function useNotifications(participantKey: string | null, groupSlug: strin
   const [loading, setLoading] = useState(true);
   const supported = isPushSupported();
 
-  // Check current permission + server subscription status
+  // Check current permission + server subscription status, auto-subscribe if permission already granted
   useEffect(() => {
     if (!supported || !participantKey) {
       setLoading(false);
       return;
     }
 
-    setPermission(Notification.permission);
+    const perm = Notification.permission;
+    setPermission(perm);
 
     fetch(`/api/notifications/status?group=${encodeURIComponent(groupSlug)}&participantKey=${encodeURIComponent(participantKey)}`)
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
-        if (data) setSubscribed(data.subscribed);
+      .then(async (data) => {
+        if (data?.subscribed) {
+          setSubscribed(true);
+        } else if (perm === "granted" && VAPID_PUBLIC_KEY) {
+          // Permission granted but not subscribed on server — auto-subscribe
+          try {
+            const registration = await navigator.serviceWorker.ready;
+            const subscription = await registration.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as BufferSource,
+            });
+            const json = subscription.toJSON();
+            if (json.endpoint && json.keys) {
+              const res = await fetch("/api/notifications/subscribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  participantKey,
+                  groupSlug,
+                  subscription: {
+                    endpoint: json.endpoint,
+                    keys: { p256dh: json.keys.p256dh, auth: json.keys.auth },
+                  },
+                }),
+              });
+              if (res.ok) setSubscribed(true);
+            }
+          } catch (err) {
+            console.error("Auto-subscribe failed:", err);
+          }
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));

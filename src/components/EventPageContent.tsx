@@ -266,16 +266,6 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
           )}
 
           {status === "in" && !isFinalized && (
-            <TimeRangeSlider
-              earliestTime={event.earliestTime}
-              latestTime={event.latestTime}
-              availableFrom={availableFrom}
-              availableTo={availableTo}
-              onChange={handleTimeChange}
-            />
-          )}
-
-          {status === "in" && !isFinalized && (
             <LocationVoting
               locations={locations}
               responses={responses}
@@ -286,6 +276,16 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
               eventId={event.id}
               participantKey={participantKey ?? undefined}
               onLocationAdded={refresh}
+            />
+          )}
+
+          {status === "in" && !isFinalized && (
+            <TimeRangeSlider
+              earliestTime={event.earliestTime}
+              latestTime={event.latestTime}
+              availableFrom={availableFrom}
+              availableTo={availableTo}
+              onChange={handleTimeChange}
             />
           )}
 

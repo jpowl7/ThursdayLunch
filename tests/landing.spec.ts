@@ -5,7 +5,7 @@ test.describe("Landing page", () => {
     await page.goto("/");
 
     await expect(
-      page.getByRole("heading", { name: "I LIKE LUNCH!" })
+      page.getByRole("heading", { name: "I Like Lunch!" })
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Join a Group/i })

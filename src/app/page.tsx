@@ -94,10 +94,10 @@ export default function LandingPage() {
               lunch_dining
             </span>
             <h1 className="text-3xl font-bold mt-2 text-slate-800">
-              I LIKE LUNCH!
+              I Like Lunch!
             </h1>
             <p className="text-slate-400 mt-1">
-              Organize group lunches, effortlessly
+              Organize group meals, effortlessly
             </p>
           </div>
 

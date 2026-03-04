@@ -68,6 +68,7 @@ function LeaderboardSection({
 
 export function Leaderboard({ participantKey, groupSlug }: { participantKey: string | null; groupSlug: string }) {
   const [data, setData] = useState<LeaderboardData | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     fetch(`/api/leaderboard?group=${encodeURIComponent(groupSlug)}`)
@@ -79,19 +80,28 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
   if (!data || data.totalEvents === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="bg-white rounded-xl border border-orange-500/10 shadow-sm">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-between w-full p-4"
+      >
         <h2 className="text-base font-bold text-slate-800 flex items-center gap-1.5">
           <span className="material-symbols-outlined text-orange-500 text-[20px]">
             leaderboard
           </span>
           Leaderboard
         </h2>
-        <span className="text-xs text-slate-400">
-          {data.totalEvents} {data.totalEvents === 1 ? "lunch" : "lunches"}
-        </span>
-      </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-400">
+            {data.totalEvents} {data.totalEvents === 1 ? "lunch" : "lunches"}
+          </span>
+          <span className={`material-symbols-outlined text-slate-400 text-[20px] transition-transform ${open ? "rotate-180" : ""}`}>
+            expand_more
+          </span>
+        </div>
+      </button>
 
+      {open && <div className="px-4 pb-4 space-y-4">
       <LeaderboardSection
         title="Most Loyal Luncher"
         icon="loyalty"
@@ -148,6 +158,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         participantKey={participantKey}
         unit="wins"
       />
+      </div>}
     </div>
   );
 }

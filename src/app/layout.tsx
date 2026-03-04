@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
 import { Toaster } from "sonner";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -34,7 +35,6 @@ export const viewport: Viewport = {
   themeColor: "#f97316",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -54,7 +54,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
       >
-        {children}
+        <PullToRefresh>{children}</PullToRefresh>
         <Toaster position="top-center" duration={3000} closeButton />
         <script
           dangerouslySetInnerHTML={{
