@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { CreateEventSchema } from "@/lib/schemas";
 import { createEvent, getGroupBySlug } from "@/lib/db/queries";
 import { getPlaceDetails } from "@/lib/google-places";
+import { sendPushToGroup } from "@/lib/push";
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,6 +48,16 @@ export async function POST(request: NextRequest) {
     );
 
     const snapshot = await createEvent(eventInput, resolvedLocations, group.id);
+
+    after(async () => {
+      await sendPushToGroup(group.id, {
+        title: "Thursday lunch is on!",
+        body: "Vote now.",
+        url: `/g/${groupSlug}`,
+        tag: `event-${snapshot?.event?.id}`,
+      });
+    });
+
     return NextResponse.json(snapshot, { status: 201 });
   } catch (error) {
     console.error("Error creating event:", error);

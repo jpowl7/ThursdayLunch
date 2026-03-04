@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
-import { upsertResponse, getEventById } from "@/lib/db/queries";
+import { upsertResponse, getEventById, getGroupByEventId } from "@/lib/db/queries";
+import { sendPushToGroup } from "@/lib/push";
 
 export async function PUT(
   request: NextRequest,
@@ -24,6 +26,21 @@ export async function PUT(
 
     const { participantKey, ...input } = parsed.data;
     const response = await upsertResponse(id, participantKey, input);
+
+    if (input.status === "in") {
+      after(async () => {
+        const group = await getGroupByEventId(id);
+        if (group) {
+          await sendPushToGroup(group.id, {
+            title: "New RSVP!",
+            body: `${input.name} is in for Thursday!`,
+            url: `/g/${group.slug}`,
+            tag: `rsvp-${id}`,
+          }, participantKey);
+        }
+      });
+    }
+
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error upserting response:", error);

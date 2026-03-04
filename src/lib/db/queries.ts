@@ -89,6 +89,15 @@ export async function getParticipantByKey(participantKey: string) {
   return rows[0] ? mapParticipant(rows[0]) : null;
 }
 
+export async function getParticipantByName(name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM participants
+    WHERE LOWER(name) = LOWER(${name})
+  `;
+  return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
 export async function updateParticipantPin(participantKey: string, currentPin: string, newPin: string) {
   const sql = getDb();
   const rows = await sql`
@@ -564,6 +573,71 @@ export async function getLeaderboardTrendsetter(groupId: string) {
     ORDER BY count DESC, latest_name.name
     LIMIT 10
   `;
+}
+
+// ── Push subscription queries ─────────────────────────────────
+
+export async function upsertPushSubscription(
+  participantKey: string,
+  groupId: string,
+  endpoint: string,
+  p256dh: string,
+  auth: string
+) {
+  const sql = getDb();
+  const rows = await sql`
+    INSERT INTO push_subscriptions (participant_key, group_id, endpoint, p256dh, auth)
+    VALUES (${participantKey}, ${groupId}, ${endpoint}, ${p256dh}, ${auth})
+    ON CONFLICT (participant_key, group_id, endpoint) DO UPDATE SET
+      p256dh = ${p256dh},
+      auth = ${auth}
+    RETURNING *
+  `;
+  return rows[0];
+}
+
+export async function deletePushSubscription(
+  participantKey: string,
+  groupId: string,
+  endpoint: string
+) {
+  const sql = getDb();
+  await sql`
+    DELETE FROM push_subscriptions
+    WHERE participant_key = ${participantKey}
+      AND group_id = ${groupId}
+      AND endpoint = ${endpoint}
+  `;
+}
+
+export async function isPushSubscribed(participantKey: string, groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1 FROM push_subscriptions
+    WHERE participant_key = ${participantKey} AND group_id = ${groupId}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function getPushSubscriptionsForGroup(groupId: string, excludeParticipantKey?: string) {
+  const sql = getDb();
+  const rows = excludeParticipantKey
+    ? await sql`
+        SELECT * FROM push_subscriptions
+        WHERE group_id = ${groupId} AND participant_key != ${excludeParticipantKey}
+      `
+    : await sql`
+        SELECT * FROM push_subscriptions
+        WHERE group_id = ${groupId}
+      `;
+  return rows.map((r) => ({
+    participantKey: r.participant_key as string,
+    groupId: r.group_id as string,
+    endpoint: r.endpoint as string,
+    p256dh: r.p256dh as string,
+    auth: r.auth as string,
+  }));
 }
 
 // ── Row mappers ──────────────────────────────────────────────

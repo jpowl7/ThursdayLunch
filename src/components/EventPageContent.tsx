@@ -14,6 +14,8 @@ import { AttendeeList } from "@/components/event/AttendeeList";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
 import { ConnectionStatus } from "@/components/event/ConnectionStatus";
 import { ShareButton } from "@/components/event/ShareButton";
+import { NotificationBell } from "@/components/event/NotificationBell";
+import { NotificationPrompt } from "@/components/event/NotificationPrompt";
 import { Leaderboard } from "@/components/event/Leaderboard";
 import { PastLunches } from "@/components/event/PastLunches";
 import { NearbyRestaurants } from "@/components/event/NearbyRestaurants";
@@ -26,7 +28,7 @@ interface EventPageContentProps {
 }
 
 export function EventPageContent({ groupSlug }: EventPageContentProps) {
-  const { key: participantKey } = useParticipantKey();
+  const { key: participantKey, setParticipantKey } = useParticipantKey();
   const { name: savedName, setName: persistName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -222,7 +224,12 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     <div className="flex justify-center min-h-screen">
       <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
         <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
-          <EventHeader event={event} shareButton={<ShareButton event={event} groupSlug={groupSlug} />} />
+          <EventHeader event={event} shareButton={
+            <div className="flex items-center gap-0.5">
+              <NotificationBell participantKey={participantKey} groupSlug={groupSlug} />
+              <ShareButton event={event} groupSlug={groupSlug} />
+            </div>
+          } />
         </header>
 
         {isOpenGroup && (
@@ -243,6 +250,15 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             onToggle={handleToggle}
             disabled={isFinalized}
             participantKey={participantKey ?? undefined}
+            onParticipantKeyChange={setParticipantKey}
+            onSignOut={() => { setName(""); setStatus("out"); persistName(""); }}
+            eventId={event.id}
+          />
+
+          <NotificationPrompt
+            participantKey={participantKey}
+            groupSlug={groupSlug}
+            hasRsvped={status === "in"}
           />
 
           {responses.length > 0 && (

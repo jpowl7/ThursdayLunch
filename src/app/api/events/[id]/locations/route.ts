@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { AddLocationSchema } from "@/lib/schemas";
-import { addLocation, getEventById, getEventSnapshot } from "@/lib/db/queries";
+import { addLocation, getEventById, getEventSnapshot, getGroupByEventId } from "@/lib/db/queries";
 import { getPlaceDetails, lookupPlace } from "@/lib/google-places";
+import { sendPushToGroup } from "@/lib/push";
 
 export async function POST(
   request: NextRequest,
@@ -47,6 +49,19 @@ export async function POST(
       websiteUrl: placeInfo?.websiteUrl ?? undefined,
       addedBy: parsed.data.addedBy,
     });
+
+    after(async () => {
+      const group = await getGroupByEventId(id);
+      if (group) {
+        await sendPushToGroup(group.id, {
+          title: "New spot suggested!",
+          body: `Someone added ${parsed.data.name}`,
+          url: `/g/${group.slug}`,
+          tag: `location-${location.id}`,
+        }, parsed.data.addedBy);
+      }
+    });
+
     return NextResponse.json(location, { status: 201 });
   } catch (error) {
     console.error("Error adding location:", error);

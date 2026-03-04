@@ -6,7 +6,10 @@
       "Bash(node *)",
       "Bash(git *)",
       "Bash(gh *)",
-      "Bash(vercel *)"
+      "Bash(vercel *)",
+      "Bash(git add src/components/event/EventHeader.tsx src/components/event/ShareButton.tsx src/app/page.tsx && git commit -m \"$\\(cat <<'EOF'\nMove status badge to center and share icon to same line in header\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin main 2>&1)",
+      "Bash(git add src/components/event/EventHeader.tsx && git commit -m \"$\\(cat <<'EOF'\nRedesign header: 'Voting open for <date>', smaller title\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\" && git push origin main 2>&1)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

@@ -20,25 +20,66 @@ interface AttendeeToggleProps {
   onToggle: (status: Status, name: string) => void;
   disabled?: boolean;
   participantKey?: string;
+  onParticipantKeyChange?: (newKey: string) => void;
+  onSignOut?: () => void;
+  eventId?: string;
 }
 
-export function AttendeeToggle({ status, name, onToggle, disabled, participantKey }: AttendeeToggleProps) {
+export function AttendeeToggle({ status, name, onToggle, disabled, participantKey, onParticipantKeyChange, onSignOut, eventId }: AttendeeToggleProps) {
   const [showNameDialog, setShowNameDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
+  const [showLoginPinDialog, setShowLoginPinDialog] = useState(false);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
   const [nameInput, setNameInput] = useState(name);
   const [pendingStatus, setPendingStatus] = useState<Status>("in");
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
+  const [loginPin, setLoginPin] = useState("");
   const [pinError, setPinError] = useState("");
+  const [loginPinError, setLoginPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
+  const [loginPinLoading, setLoginPinLoading] = useState(false);
+  const [pendingLoginName, setPendingLoginName] = useState("");
+  const [conflictName, setConflictName] = useState("");
 
   // Sync nameInput when name prop changes (e.g., from SSE)
   useEffect(() => {
     if (name) setNameInput(name);
   }, [name]);
 
-  const handleStatusClick = (newStatus: Status) => {
+  // Returns true if the name is OK to use, false if blocked (dialog shown)
+  const checkNameConflict = async (checkName: string, newStatus: Status): Promise<boolean> => {
+    try {
+      const params = new URLSearchParams({ name: checkName, participantKey: participantKey || "" });
+      if (eventId) params.set("eventId", eventId);
+      const res = await fetch(`/api/participants/check?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.registered && !data.isOwner) {
+          // Registered name — require PIN
+          setPendingStatus(newStatus);
+          setPendingLoginName(checkName);
+          setLoginPin("");
+          setLoginPinError("");
+          setShowLoginPinDialog(true);
+          return false;
+        }
+        if (data.conflict) {
+          // Same name already on this event from a different device
+          setPendingStatus(newStatus);
+          setConflictName(checkName);
+          setShowConflictDialog(true);
+          return false;
+        }
+      }
+    } catch {
+      // If check fails, allow through
+    }
+    return true;
+  };
+
+  const handleStatusClick = async (newStatus: Status) => {
     if (newStatus === status) return;
     if (!name) {
       setPendingStatus(newStatus);
@@ -51,6 +92,11 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
       setShowConfirmDialog(true);
       return;
     }
+    // Check for name conflicts when RSVPing with a saved name
+    if (newStatus === "in") {
+      const ok = await checkNameConflict(name, newStatus);
+      if (!ok) return;
+    }
     onToggle(newStatus, name);
   };
 
@@ -59,10 +105,48 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
     onToggle(pendingStatus, name);
   };
 
-  const handleNameSubmit = () => {
-    if (nameInput.trim()) {
-      setShowNameDialog(false);
-      onToggle(pendingStatus, nameInput.trim());
+  const handleNameSubmit = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+
+    setShowNameDialog(false);
+    const ok = await checkNameConflict(trimmed, pendingStatus);
+    if (!ok) return;
+
+    onToggle(pendingStatus, trimmed);
+  };
+
+  const handleLoginPinSubmit = async () => {
+    if (!/^\d{4}$/.test(loginPin)) {
+      setLoginPinError("PIN must be exactly 4 digits");
+      return;
+    }
+
+    setLoginPinLoading(true);
+    setLoginPinError("");
+
+    try {
+      const res = await fetch("/api/participants/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: pendingLoginName, pin: loginPin }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        // Swap to the registered participant's key
+        if (onParticipantKeyChange && data.participantKey) {
+          onParticipantKeyChange(data.participantKey);
+        }
+        setShowLoginPinDialog(false);
+        onToggle(pendingStatus, pendingLoginName);
+      } else {
+        setLoginPinError("Wrong PIN. Try again.");
+      }
+    } catch {
+      setLoginPinError("Something went wrong, try again");
+    } finally {
+      setLoginPinLoading(false);
     }
   };
 
@@ -183,6 +267,15 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
             >
               <span className="material-symbols-outlined text-[16px]">key</span>
             </button>
+            {onSignOut && (
+              <button
+                onClick={onSignOut}
+                className="text-slate-300 hover:text-slate-500 transition-colors"
+                title="Sign out"
+              >
+                <span className="material-symbols-outlined text-[16px]">logout</span>
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -276,6 +369,80 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
               disabled={pinLoading || currentPin.length !== 4 || newPin.length !== 4}
             >
               {pinLoading ? "Updating..." : "Update PIN"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showLoginPinDialog} onOpenChange={setShowLoginPinDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify it&apos;s you</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-500">
+            <span className="font-semibold">{pendingLoginName}</span> is a registered name. Enter the PIN to sign in.
+          </p>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="login-pin">PIN</Label>
+              <Input
+                id="login-pin"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={loginPin}
+                onChange={(e) => setLoginPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Enter 4-digit PIN"
+                onKeyDown={(e) => e.key === "Enter" && handleLoginPinSubmit()}
+                autoFocus
+              />
+            </div>
+            {loginPinError && (
+              <p className="text-sm text-red-500">{loginPinError}</p>
+            )}
+            <Button
+              onClick={handleLoginPinSubmit}
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              disabled={loginPinLoading || loginPin.length !== 4}
+            >
+              {loginPinLoading ? "Verifying..." : "Sign In"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Name already in use</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-slate-500">
+            <span className="font-semibold">{conflictName}</span> is already on this event from another device.
+          </p>
+          <div className="flex flex-col gap-2 pt-2">
+            <Button
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              onClick={() => {
+                setShowConflictDialog(false);
+                setPendingLoginName(conflictName);
+                setLoginPin("");
+                setLoginPinError("");
+                setShowLoginPinDialog(true);
+              }}
+            >
+              Sign in with PIN
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowConflictDialog(false);
+                setNameInput("");
+                setPendingStatus(pendingStatus);
+                setShowNameDialog(true);
+              }}
+            >
+              Use a different name
             </Button>
           </div>
         </DialogContent>

@@ -2,3 +2,5 @@ export { EventSchema, CreateEventSchema, LocationSchema, CreateLocationInput, Ad
 export type { Event, CreateEventInput, Location } from "./event";
 export { ResponseSchema, UpsertResponseSchema, ToggleResponseSchema } from "./response";
 export type { Response, UpsertResponseInput } from "./response";
+export { PushSubscribeSchema, PushUnsubscribeSchema } from "./notification";
+export type { PushSubscribeInput, PushUnsubscribeInput } from "./notification";

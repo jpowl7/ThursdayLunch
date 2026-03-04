@@ -55,7 +55,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
       >
         {children}
-        <Toaster position="top-center" duration={Infinity} closeButton />
+        <Toaster position="top-center" duration={3000} closeButton />
         <script
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js');`,

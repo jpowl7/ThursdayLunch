@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { z } from "zod";
-import { finalizeEvent, reopenEvent, getEventById, getGroupByEventId } from "@/lib/db/queries";
+import { finalizeEvent, reopenEvent, getEventById, getGroupByEventId, getEventSnapshot } from "@/lib/db/queries";
+import { sendPushToGroup } from "@/lib/push";
 
 const FinalizeSchema = z.object({
   chosenTime: z.string(),
@@ -35,6 +37,18 @@ export async function PATCH(
     }
 
     const updated = await finalizeEvent(id, parsed.data.chosenTime, parsed.data.chosenLocationId);
+
+    after(async () => {
+      const snapshot = await getEventSnapshot(id);
+      const locationName = snapshot?.locations?.find((l) => l.id === parsed.data.chosenLocationId)?.name || "a restaurant";
+      await sendPushToGroup(group.id, {
+        title: "It's decided!",
+        body: `We're eating at ${locationName} at ${parsed.data.chosenTime}.`,
+        url: `/g/${group.slug}`,
+        tag: `finalized-${id}`,
+      });
+    });
+
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error finalizing event:", error);
