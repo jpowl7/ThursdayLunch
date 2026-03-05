@@ -202,7 +202,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             </div>
           </div>
           <div className="px-6 pb-8 space-y-5">
-            <Leaderboard participantKey={participantKey} groupSlug={groupSlug} />
+            <Leaderboard currentName={savedName ?? null} groupSlug={groupSlug} />
             <PastLunches groupSlug={groupSlug} />
             <NearbyRestaurants />
             <div className="flex justify-center gap-3 pt-2 pb-4">
@@ -291,7 +291,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
 
           <AttendeeList responses={responses} locations={locations} currentParticipantKey={participantKey} />
 
-          <Leaderboard participantKey={participantKey} groupSlug={groupSlug} />
+          <Leaderboard currentName={myResponse?.name ?? savedName ?? null} groupSlug={groupSlug} />
           <PastLunches groupSlug={groupSlug} />
           <NearbyRestaurants />
 

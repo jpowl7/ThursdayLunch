@@ -382,19 +382,13 @@ export async function getFinalizedEventCount(groupId: string): Promise<number> {
 export async function getLeaderboardAttendance(groupId: string) {
   const sql = getDb();
   return sql`
-    SELECT r.participant_key,
-           latest_name.name,
+    SELECT MAX(r.name) AS name,
            COUNT(*)::int AS count
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = r.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
     WHERE r.status = 'in'
-    GROUP BY r.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(r.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }
@@ -402,21 +396,15 @@ export async function getLeaderboardAttendance(groupId: string) {
 export async function getLeaderboardTastemaker(groupId: string) {
   const sql = getDb();
   return sql`
-    SELECT r.participant_key,
-           latest_name.name,
+    SELECT MAX(r.name) AS name,
            COUNT(*)::int AS count
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = r.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
     WHERE r.status = 'in'
       AND r.preferred_location_id IS NOT NULL
       AND r.preferred_location_id = e.chosen_location_id
-    GROUP BY r.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(r.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }
@@ -426,23 +414,17 @@ export async function getLeaderboardFirstResponder(groupId: string) {
   return sql`
     WITH first_responders AS (
       SELECT DISTINCT ON (r.event_id)
-             r.participant_key
+             r.name
       FROM responses r
       JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
       WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at
     )
-    SELECT fr.participant_key,
-           latest_name.name,
+    SELECT MAX(fr.name) AS name,
            COUNT(*)::int AS count
     FROM first_responders fr
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = fr.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
-    GROUP BY fr.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(fr.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }
@@ -459,7 +441,7 @@ export async function getLeaderboardStreaks(groupId: string) {
 
   const eventIds = events.map((e) => e.id as string);
   const attendees = await sql`
-    SELECT r.event_id, r.participant_key
+    SELECT r.event_id, r.name
     FROM responses r
     WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in'
   `;
@@ -467,26 +449,31 @@ export async function getLeaderboardStreaks(groupId: string) {
   const eventAttendees = new Map<string, Set<string>>();
   for (const row of attendees) {
     const eventId = row.event_id as string;
-    const pk = row.participant_key as string;
+    const nameLower = (row.name as string).toLowerCase();
     if (!eventAttendees.has(eventId)) eventAttendees.set(eventId, new Set());
-    eventAttendees.get(eventId)!.add(pk);
+    eventAttendees.get(eventId)!.add(nameLower);
   }
 
-  const allParticipants = new Set<string>();
-  for (const row of attendees) allParticipants.add(row.participant_key as string);
+  const displayNames = new Map<string, string>();
+  const allNames = new Set<string>();
+  for (const row of attendees) {
+    const nameLower = (row.name as string).toLowerCase();
+    allNames.add(nameLower);
+    displayNames.set(nameLower, row.name as string);
+  }
 
   const streaks = new Map<string, number>();
-  for (const pk of allParticipants) {
+  for (const nameLower of allNames) {
     let streak = 0;
     for (const event of events) {
       const set = eventAttendees.get(event.id as string);
-      if (set?.has(pk)) {
+      if (set?.has(nameLower)) {
         streak++;
       } else {
         break;
       }
     }
-    if (streak > 0) streaks.set(pk, streak);
+    if (streak > 0) streaks.set(nameLower, streak);
   }
 
   if (streaks.size === 0) return [];
@@ -495,18 +482,8 @@ export async function getLeaderboardStreaks(groupId: string) {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10);
 
-  const keys = sorted.map((s) => s[0]);
-  const names = await sql`
-    SELECT DISTINCT ON (participant_key) participant_key, name
-    FROM responses
-    WHERE participant_key = ANY(${keys})
-    ORDER BY participant_key, created_at DESC
-  `;
-  const nameMap = new Map(names.map((n) => [n.participant_key as string, n.name as string]));
-
-  return sorted.map(([pk, count]) => ({
-    participant_key: pk,
-    name: nameMap.get(pk) || "Unknown",
+  return sorted.map(([nameLower, count]) => ({
+    name: displayNames.get(nameLower) || "Unknown",
     count,
   }));
 }
@@ -514,20 +491,14 @@ export async function getLeaderboardStreaks(groupId: string) {
 export async function getLeaderboardSpeedDemon(groupId: string) {
   const sql = getDb();
   return sql`
-    SELECT r.participant_key,
-           latest_name.name,
+    SELECT MAX(r.name) AS name,
            COUNT(*)::int AS count
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = r.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
     WHERE r.status = 'in'
       AND r.created_at <= e.created_at + INTERVAL '5 minutes'
-    GROUP BY r.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(r.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }
@@ -537,23 +508,17 @@ export async function getLeaderboardFashionablyLate(groupId: string) {
   return sql`
     WITH last_responders AS (
       SELECT DISTINCT ON (r.event_id)
-             r.participant_key
+             r.name
       FROM responses r
       JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
       WHERE r.status = 'in'
       ORDER BY r.event_id, r.created_at DESC
     )
-    SELECT lr.participant_key,
-           latest_name.name,
+    SELECT MAX(lr.name) AS name,
            COUNT(*)::int AS count
     FROM last_responders lr
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = lr.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
-    GROUP BY lr.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(lr.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }
@@ -563,7 +528,7 @@ export async function getLeaderboardTrendsetter(groupId: string) {
   return sql`
     WITH first_voters AS (
       SELECT DISTINCT ON (e.id)
-             r.participant_key
+             r.name
       FROM events e
       JOIN responses r ON r.event_id = e.id
       JOIN location_votes lv ON lv.response_id = r.id AND lv.location_id = e.chosen_location_id
@@ -572,17 +537,11 @@ export async function getLeaderboardTrendsetter(groupId: string) {
         AND e.group_id = ${groupId}
       ORDER BY e.id, lv.created_at ASC
     )
-    SELECT fv.participant_key,
-           latest_name.name,
+    SELECT MAX(fv.name) AS name,
            COUNT(*)::int AS count
     FROM first_voters fv
-    JOIN LATERAL (
-      SELECT r2.name FROM responses r2
-      WHERE r2.participant_key = fv.participant_key
-      ORDER BY r2.created_at DESC LIMIT 1
-    ) latest_name ON true
-    GROUP BY fv.participant_key, latest_name.name
-    ORDER BY count DESC, latest_name.name
+    GROUP BY LOWER(fv.name)
+    ORDER BY count DESC, name
     LIMIT 10
   `;
 }

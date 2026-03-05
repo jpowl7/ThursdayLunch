@@ -13,7 +13,6 @@ export interface LocationVoteTally {
 }
 
 export interface LeaderboardEntry {
-  participantKey: string;
   name: string;
   count: number;
 }

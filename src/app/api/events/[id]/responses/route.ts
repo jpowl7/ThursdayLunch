@@ -37,19 +37,23 @@ export async function PUT(
 
     const response = await upsertResponse(id, participantKey, input);
 
-    if (input.status === "in") {
-      after(async () => {
-        const group = await getGroupByEventId(id);
-        if (group) {
-          await sendPushToGroup(group.id, {
-            title: "New RSVP!",
-            body: `${input.name} is in for Thursday!`,
-            url: `/g/${group.slug}`,
-            tag: `rsvp-${id}`,
-          }, participantKey);
-        }
-      });
-    }
+    const statusMessages: Record<string, string> = {
+      in: `${input.name} is in!`,
+      maybe: `${input.name} is a maybe`,
+      out: `${input.name} is out`,
+    };
+
+    after(async () => {
+      const group = await getGroupByEventId(id);
+      if (group) {
+        await sendPushToGroup(group.id, {
+          title: "RSVP Update",
+          body: statusMessages[input.status],
+          url: `/g/${group.slug}`,
+          tag: `rsvp-${id}`,
+        }, participantKey);
+      }
+    });
 
     return NextResponse.json(response);
   } catch (error) {

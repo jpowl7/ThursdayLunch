@@ -15,14 +15,14 @@ function LeaderboardSection({
   icon,
   description,
   entries,
-  participantKey,
+  currentName,
   unit,
 }: {
   title: string;
   icon: string;
   description: string;
   entries: LeaderboardEntry[];
-  participantKey: string | null;
+  currentName: string | null;
   unit: string;
 }) {
   if (entries.length === 0) return null;
@@ -38,10 +38,10 @@ function LeaderboardSection({
       </div>
       <div className="space-y-1">
         {entries.map((entry, i) => {
-          const isYou = entry.participantKey === participantKey;
+          const isYou = currentName != null && entry.name.toLowerCase() === currentName.toLowerCase();
           return (
             <div
-              key={entry.participantKey}
+              key={entry.name}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${
                 isYou
                   ? "bg-orange-100 font-semibold text-orange-900"
@@ -66,7 +66,7 @@ function LeaderboardSection({
   );
 }
 
-export function Leaderboard({ participantKey, groupSlug }: { participantKey: string | null; groupSlug: string }) {
+export function Leaderboard({ currentName, groupSlug }: { currentName: string | null; groupSlug: string }) {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -107,7 +107,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="loyalty"
         description="Most lunches attended across all events"
         entries={data.attendance}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="lunches"
       />
       <LeaderboardSection
@@ -115,7 +115,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="local_fire_department"
         description="Consecutive lunches attended in a row"
         entries={data.streaks}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="streak"
       />
       <LeaderboardSection
@@ -123,7 +123,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="star"
         description="Top pick matched the final venue choice"
         entries={data.tastemaker}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="picks"
       />
       <LeaderboardSection
@@ -131,7 +131,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="bolt"
         description="First person to RSVP for an event"
         entries={data.firstResponder}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="wins"
       />
       <LeaderboardSection
@@ -139,7 +139,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="speed"
         description="Responded within 5 minutes of event creation"
         entries={data.speedDemon}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="times"
       />
       <LeaderboardSection
@@ -147,7 +147,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="schedule"
         description="Last person to RSVP for a finalized event"
         entries={data.fashionablyLate}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="times"
       />
       <LeaderboardSection
@@ -155,7 +155,7 @@ export function Leaderboard({ participantKey, groupSlug }: { participantKey: str
         icon="trending_up"
         description="First to vote for the winning restaurant"
         entries={data.trendsetter}
-        participantKey={participantKey}
+        currentName={currentName}
         unit="wins"
       />
       </div>}

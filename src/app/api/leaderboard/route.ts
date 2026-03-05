@@ -13,7 +13,6 @@ import {
 
 function mapEntries(rows: Record<string, unknown>[]) {
   return rows.map((r) => ({
-    participantKey: r.participant_key as string,
     name: r.name as string,
     count: r.count as number,
   }));
