@@ -575,6 +575,43 @@ export async function getLeaderboardTrendsetter(groupId: string) {
   `;
 }
 
+// ── Past locations query ──────────────────────────────────────
+
+export async function getPastLocations(groupId: string, excludeEventId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    WITH ranked AS (
+      SELECT
+        l.name,
+        l.address,
+        l.maps_url,
+        l.website_url,
+        COUNT(*)::int AS use_count,
+        ROW_NUMBER() OVER (
+          PARTITION BY LOWER(l.name)
+          ORDER BY l.created_at DESC
+        ) AS rn
+      FROM locations l
+      JOIN events e ON e.id = l.event_id
+      WHERE e.group_id = ${groupId}
+        AND l.event_id != ${excludeEventId}
+      GROUP BY LOWER(l.name), l.name, l.address, l.maps_url, l.website_url, l.created_at
+    )
+    SELECT name, address, maps_url, website_url, use_count
+    FROM ranked
+    WHERE rn = 1
+    ORDER BY use_count DESC, name
+    LIMIT 20
+  `;
+  return rows.map((r) => ({
+    name: r.name as string,
+    address: (r.address as string) || null,
+    mapsUrl: (r.maps_url as string) || null,
+    websiteUrl: (r.website_url as string) || null,
+    useCount: r.use_count as number,
+  }));
+}
+
 // ── Push subscription queries ─────────────────────────────────
 
 export async function upsertPushSubscription(

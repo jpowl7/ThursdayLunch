@@ -1,9 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import type { Location, Response } from "@/lib/schemas";
 import { PlacesAutocomplete } from "@/components/PlacesAutocomplete";
 import { toast } from "sonner";
+
+interface PastLocation {
+  name: string;
+  address: string | null;
+  mapsUrl: string | null;
+  websiteUrl: string | null;
+  useCount: number;
+}
 
 interface LocationVotingProps {
   locations: Location[];
@@ -35,6 +43,30 @@ export function LocationVoting({
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
+  const [pastLocations, setPastLocations] = useState<PastLocation[]>([]);
+  const [addingChip, setAddingChip] = useState<string | null>(null);
+
+  const fetchPastLocations = useCallback(async () => {
+    if (!eventId) return;
+    try {
+      const res = await fetch(`/api/events/${eventId}/past-locations`);
+      if (res.ok) {
+        const data: PastLocation[] = await res.json();
+        setPastLocations(data);
+      }
+    } catch {
+      // ignore
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    fetchPastLocations();
+  }, [fetchPastLocations]);
+
+  // Filter out locations already on the current event
+  const availableChips = pastLocations.filter(
+    (pl) => !locations.some((loc) => loc.name.toLowerCase() === pl.name.toLowerCase())
+  );
 
   // Duplicate check
   const isDuplicate = newName.trim().length > 0 && locations.some(
@@ -111,6 +143,43 @@ export function LocationVoting({
       // ignore
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleQuickAdd = async (pl: PastLocation) => {
+    if (!eventId || addingChip) return;
+    setAddingChip(pl.name);
+    try {
+      const res = await fetch(`/api/events/${eventId}/locations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: pl.name,
+          addedBy: participantKey || undefined,
+        }),
+      });
+      if (res.ok) {
+        const added = await res.json();
+        if (added?.id) {
+          setRecentlyAdded((prev) => new Set(prev).add(added.id));
+          setTimeout(() => {
+            setRecentlyAdded((prev) => {
+              const next = new Set(prev);
+              next.delete(added.id);
+              return next;
+            });
+          }, 15000);
+        }
+        onLocationAdded?.();
+        fetchPastLocations();
+      } else if (res.status === 409) {
+        toast.error("Already on the list");
+        fetchPastLocations();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setAddingChip(null);
     }
   };
 
@@ -270,6 +339,34 @@ export function LocationVoting({
           </button>
         )}
       </div>
+
+      {/* Prior added locations quick-pick */}
+      {eventId && !disabled && availableChips.length > 0 && (
+        <div>
+          <p className="text-[11px] text-slate-400 mb-1.5">Prior added locations</p>
+          <div className="flex flex-wrap gap-1.5">
+            {availableChips.slice(0, 8).map((pl) => (
+              <button
+                key={pl.name}
+                type="button"
+                onClick={() => handleQuickAdd(pl)}
+                disabled={addingChip !== null}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full border border-slate-200 bg-white text-slate-600 hover:border-orange-400 hover:text-orange-600 transition-colors disabled:opacity-50"
+              >
+                {addingChip === pl.name ? (
+                  <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                ) : (
+                  <span className="material-symbols-outlined text-[14px]">add</span>
+                )}
+                {pl.name}
+                {pl.useCount > 1 && (
+                  <span className="text-[10px] text-slate-400">{pl.useCount}x</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Suggest a place */}
       {eventId && !disabled && (
