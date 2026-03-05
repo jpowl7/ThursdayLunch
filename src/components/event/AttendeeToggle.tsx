@@ -93,15 +93,15 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
       return;
     }
     // Check for name conflicts when RSVPing with a saved name
-    if (newStatus === "in") {
-      const ok = await checkNameConflict(name, newStatus);
-      if (!ok) return;
-    }
+    const ok = await checkNameConflict(name, newStatus);
+    if (!ok) return;
     onToggle(newStatus, name);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     setShowConfirmDialog(false);
+    const ok = await checkNameConflict(name, pendingStatus);
+    if (!ok) return;
     onToggle(pendingStatus, name);
   };
 

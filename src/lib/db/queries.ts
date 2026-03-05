@@ -173,6 +173,18 @@ export async function createEvent(
   return getEventSnapshot(event.id);
 }
 
+export async function hasConflictingResponse(eventId: string, participantKey: string, name: string): Promise<boolean> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1 FROM responses
+    WHERE event_id = ${eventId}
+      AND LOWER(name) = LOWER(${name})
+      AND participant_key != ${participantKey}
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
 export async function upsertResponse(
   eventId: string,
   participantKey: string,

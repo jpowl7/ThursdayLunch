@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
-import { upsertResponse, getEventById, getGroupByEventId } from "@/lib/db/queries";
+import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 
 export async function PUT(
@@ -25,6 +25,16 @@ export async function PUT(
     }
 
     const { participantKey, ...input } = parsed.data;
+
+    // Server-side duplicate name guard
+    const conflict = await hasConflictingResponse(id, participantKey, input.name);
+    if (conflict) {
+      return NextResponse.json(
+        { error: "This name is already in use for this event by another participant" },
+        { status: 409 }
+      );
+    }
+
     const response = await upsertResponse(id, participantKey, input);
 
     if (input.status === "in") {
