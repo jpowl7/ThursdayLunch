@@ -8,6 +8,7 @@ import {
   getLeaderboardSpeedDemon,
   getLeaderboardFashionablyLate,
   getLeaderboardTrendsetter,
+  getLeaderboardConeOfShame,
   getGroupBySlug,
 } from "@/lib/db/queries";
 
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const [totalEvents, attendance, tastemaker, firstResponder, streaks, speedDemon, fashionablyLate, trendsetter] =
+    const [totalEvents, attendance, tastemaker, firstResponder, streaks, speedDemon, fashionablyLate, trendsetter, coneOfShame] =
       await Promise.all([
         getFinalizedEventCount(group.id),
         getLeaderboardAttendance(group.id),
@@ -40,6 +41,7 @@ export async function GET(request: NextRequest) {
         getLeaderboardSpeedDemon(group.id),
         getLeaderboardFashionablyLate(group.id),
         getLeaderboardTrendsetter(group.id),
+        getLeaderboardConeOfShame(group.id),
       ]);
 
     return NextResponse.json({
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
       speedDemon: mapEntries(speedDemon as unknown as Record<string, unknown>[]),
       fashionablyLate: mapEntries(fashionablyLate as unknown as Record<string, unknown>[]),
       trendsetter: mapEntries(trendsetter as unknown as Record<string, unknown>[]),
+      coneOfShame: mapEntries(coneOfShame as unknown as Record<string, unknown>[]),
     });
   } catch (error) {
     console.error("Error fetching leaderboard:", error);

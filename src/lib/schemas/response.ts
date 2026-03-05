@@ -10,6 +10,7 @@ export const ResponseSchema = z.object({
   availableTo: z.string().nullable(),
   locationVotes: z.array(z.string().uuid()),
   preferredLocationId: z.string().uuid().nullable(),
+  noShow: z.boolean(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -29,6 +30,10 @@ export const UpsertResponseSchema = z.object({
 
 export const ToggleResponseSchema = z.object({
   status: z.enum(["in", "out", "maybe"]),
+});
+
+export const ToggleNoShowSchema = z.object({
+  noShow: z.boolean(),
 });
 
 export type Response = z.infer<typeof ResponseSchema>;

@@ -10,6 +10,7 @@ interface AdminResponseManagerProps {
   locations: Location[];
   eventId: string;
   token: string;
+  eventStatus: string;
   onChanged: () => void;
 }
 
@@ -20,7 +21,7 @@ function nextStatus(current: Status): Status {
   return STATUS_ORDER[(idx + 1) % STATUS_ORDER.length];
 }
 
-export function AdminResponseManager({ responses, locations, eventId, token, onChanged }: AdminResponseManagerProps) {
+export function AdminResponseManager({ responses, locations, eventId, token, eventStatus, onChanged }: AdminResponseManagerProps) {
   const locationNameById = new Map<string, string>();
   for (const loc of locations) {
     locationNameById.set(loc.id, loc.name);
@@ -44,6 +45,27 @@ export function AdminResponseManager({ responses, locations, eventId, token, onC
       if (res.ok) {
         const labels: Record<Status, string> = { in: "Going", maybe: "Maybe", out: "Out" };
         toast.success(`Moved to ${labels[newStatus]}`);
+        onChanged();
+      } else {
+        toast.error("Failed to update");
+      }
+    } catch {
+      toast.error("Network error");
+    }
+  };
+
+  const handleToggleNoShow = async (responseId: string, currentNoShow: boolean) => {
+    try {
+      const res = await fetch(`/api/events/${eventId}/responses/${responseId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ noShow: !currentNoShow }),
+      });
+      if (res.ok) {
+        toast.success(!currentNoShow ? "Marked as no-show" : "No-show removed");
         onChanged();
       } else {
         toast.error("Failed to update");
@@ -84,20 +106,39 @@ export function AdminResponseManager({ responses, locations, eventId, token, onC
     };
     const labels: Record<Status, string> = { in: "Going", maybe: "Maybe", out: "Out" };
 
+    const isNoShow = r.noShow === true;
+    const showNoShowToggle = eventStatus === "finalized" && r.status === "in";
+
     return (
-      <div key={r.id} className="flex items-center gap-3 py-2">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${statusColors[r.status]}`}>
+      <div key={r.id} className={`flex items-center gap-3 py-2 ${isNoShow ? "bg-red-50 -mx-2 px-2 rounded-lg" : ""}`}>
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${isNoShow ? "bg-red-400" : statusColors[r.status]}`}>
           {r.name.slice(0, 2).toUpperCase()}
         </div>
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold truncate">{r.name}</p>
-          {r.status === "in" && r.locationVotes.length > 0 && (
+          <p className={`text-sm font-semibold truncate ${isNoShow ? "line-through text-red-400" : ""}`}>{r.name}</p>
+          {isNoShow && (
+            <p className="text-[11px] text-red-400 font-medium">No-show</p>
+          )}
+          {!isNoShow && r.status === "in" && r.locationVotes.length > 0 && (
             <p className="text-[11px] text-slate-400 truncate">
               {r.locationVotes.map((id) => locationNameById.get(id)).filter(Boolean).join(", ")}
             </p>
           )}
         </div>
+
+        {showNoShowToggle && (
+          <button
+            type="button"
+            onClick={() => handleToggleNoShow(r.id, isNoShow)}
+            className={`p-1 rounded transition-colors ${isNoShow ? "text-red-500 hover:text-red-700" : "text-slate-300 hover:text-red-500"}`}
+            title={isNoShow ? "Remove no-show" : "Mark as no-show"}
+          >
+            <span className="material-symbols-outlined text-[18px]">
+              {isNoShow ? "person_off" : "person_cancel"}
+            </span>
+          </button>
+        )}
 
         <button
           type="button"

@@ -158,6 +158,14 @@ export function Leaderboard({ currentName, groupSlug }: { currentName: string | 
         currentName={currentName}
         unit="wins"
       />
+      <LeaderboardSection
+        title="Cone of Shame"
+        icon="sentiment_very_dissatisfied"
+        description="RSVP'd in but didn't show up"
+        entries={data.coneOfShame}
+        currentName={currentName}
+        unit="times"
+      />
       </div>}
     </div>
   );

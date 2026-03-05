@@ -264,6 +264,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
                 locations={snapshot.locations}
                 eventId={snapshot.event.id}
                 token={activePasscode!}
+                eventStatus={snapshot.event.status}
                 onChanged={fetchData}
               />
             </div>

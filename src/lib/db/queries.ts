@@ -207,6 +207,12 @@ export async function upsertResponse(
 
   const response = rows[0];
 
+  // Record history snapshot
+  await sql`
+    INSERT INTO response_history (response_id, event_id, participant_key, name, status, available_from, available_to, preferred_location_id)
+    VALUES (${response.id}, ${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
+  `;
+
   // Update location votes
   await sql`DELETE FROM location_votes WHERE response_id = ${response.id}`;
   for (const locationId of input.locationVotes) {
@@ -289,6 +295,16 @@ export async function toggleResponseStatus(responseId: string, status: "in" | "o
   }
   const rows = await sql`
     UPDATE responses SET status = 'in', updated_at = now()
+    WHERE id = ${responseId}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function toggleNoShow(responseId: string, noShow: boolean) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE responses SET no_show = ${noShow}, updated_at = now()
     WHERE id = ${responseId}
     RETURNING *
   `;
@@ -386,7 +402,7 @@ export async function getLeaderboardAttendance(groupId: string) {
            COUNT(*)::int AS count
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in'
+    WHERE r.status = 'in' AND r.no_show IS NOT TRUE
     GROUP BY LOWER(r.name)
     ORDER BY count DESC, name
     LIMIT 10
@@ -443,7 +459,7 @@ export async function getLeaderboardStreaks(groupId: string) {
   const attendees = await sql`
     SELECT r.event_id, r.name
     FROM responses r
-    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in'
+    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in' AND r.no_show IS NOT TRUE
   `;
 
   const eventAttendees = new Map<string, Set<string>>();
@@ -523,6 +539,20 @@ export async function getLeaderboardFashionablyLate(groupId: string) {
   `;
 }
 
+export async function getLeaderboardConeOfShame(groupId: string) {
+  const sql = getDb();
+  return sql`
+    SELECT MAX(r.name) AS name,
+           COUNT(*)::int AS count
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+    WHERE r.status = 'in' AND r.no_show = TRUE
+    GROUP BY LOWER(r.name)
+    ORDER BY count DESC, name
+    LIMIT 10
+  `;
+}
+
 export async function getLeaderboardTrendsetter(groupId: string) {
   const sql = getDb();
   return sql`
@@ -544,6 +574,28 @@ export async function getLeaderboardTrendsetter(groupId: string) {
     ORDER BY count DESC, name
     LIMIT 10
   `;
+}
+
+// ── Response history queries ──────────────────────────────────
+
+export async function getResponseHistory(eventId: string, name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM response_history
+    WHERE event_id = ${eventId} AND LOWER(name) = LOWER(${name})
+    ORDER BY changed_at ASC
+  `;
+  return rows.map((r) => ({
+    id: r.id as string,
+    responseId: r.response_id as string,
+    eventId: r.event_id as string,
+    name: r.name as string,
+    status: r.status as string,
+    availableFrom: r.available_from ? normalizeTime(r.available_from) : null,
+    availableTo: r.available_to ? normalizeTime(r.available_to) : null,
+    preferredLocationId: r.preferred_location_id ? String(r.preferred_location_id) : null,
+    changedAt: String(r.changed_at),
+  }));
 }
 
 // ── Past locations query ──────────────────────────────────────
@@ -702,6 +754,7 @@ function mapResponse(row: Record<string, unknown>) {
     availableTo: row.available_to ? normalizeTime(row.available_to) : null,
     locationVotes: votes,
     preferredLocationId: row.preferred_location_id ? String(row.preferred_location_id) : null,
+    noShow: row.no_show === true,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
   };

@@ -26,6 +26,7 @@ export interface LeaderboardData {
   speedDemon: LeaderboardEntry[];
   fashionablyLate: LeaderboardEntry[];
   trendsetter: LeaderboardEntry[];
+  coneOfShame: LeaderboardEntry[];
 }
 
 export interface Group {
