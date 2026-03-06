@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid name or PIN" }, { status: 401 });
     }
 
-    return NextResponse.json({ participantKey: participant.participantKey });
+    return NextResponse.json({ participantKey: participant.participantKey, name: participant.name });
   } catch (error) {
     console.error("Error logging in participant:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

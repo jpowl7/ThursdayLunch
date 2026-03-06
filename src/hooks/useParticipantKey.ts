@@ -4,20 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 
 const STORAGE_KEY = "thursday-lunch-participant-key";
 
-function generateKey(): string {
-  return crypto.randomUUID();
-}
-
 export function useParticipantKey() {
   const [key, setKeyState] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    let stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      stored = generateKey();
-      localStorage.setItem(STORAGE_KEY, stored);
-    }
+    const stored = localStorage.getItem(STORAGE_KEY);
     setKeyState(stored);
+    setLoaded(true);
   }, []);
 
   const setParticipantKey = useCallback((newKey: string) => {
@@ -25,5 +19,10 @@ export function useParticipantKey() {
     setKeyState(newKey);
   }, []);
 
-  return { key, setParticipantKey };
+  const clearParticipantKey = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setKeyState(null);
+  }, []);
+
+  return { key, loaded, setParticipantKey, clearParticipantKey };
 }

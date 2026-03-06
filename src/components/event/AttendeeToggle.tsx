@@ -17,38 +17,65 @@ type Status = "in" | "out" | "maybe";
 interface AttendeeToggleProps {
   status: Status;
   name: string;
-  onToggle: (status: Status, name: string) => void;
+  onToggle: (status: Status, name: string, participantKeyOverride?: string) => void;
   disabled?: boolean;
   participantKey?: string;
   onParticipantKeyChange?: (newKey: string) => void;
+  onNameChange?: (newName: string) => void;
   onSignOut?: () => void;
   eventId?: string;
 }
 
-export function AttendeeToggle({ status, name, onToggle, disabled, participantKey, onParticipantKeyChange, onSignOut, eventId }: AttendeeToggleProps) {
-  const [showNameDialog, setShowNameDialog] = useState(false);
+export function AttendeeToggle({ status, name, onToggle, disabled, participantKey, onParticipantKeyChange, onNameChange, onSignOut, eventId }: AttendeeToggleProps) {
+  // Dialog visibility
+  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [showLoginPinDialog, setShowLoginPinDialog] = useState(false);
   const [showConflictDialog, setShowConflictDialog] = useState(false);
+
+  // Registration mode: "register" or "login"
+  const [regMode, setRegMode] = useState<"register" | "login">("register");
+
+  // Form state
   const [nameInput, setNameInput] = useState(name);
+  const [pinInput, setPinInput] = useState("");
+  const [confirmPinInput, setConfirmPinInput] = useState("");
+  const [regError, setRegError] = useState("");
+  const [regLoading, setRegLoading] = useState(false);
+
   const [pendingStatus, setPendingStatus] = useState<Status>("in");
+
+  // Change PIN dialog state
   const [currentPin, setCurrentPin] = useState("");
   const [newPin, setNewPin] = useState("");
-  const [loginPin, setLoginPin] = useState("");
   const [pinError, setPinError] = useState("");
-  const [loginPinError, setLoginPinError] = useState("");
   const [pinLoading, setPinLoading] = useState(false);
+
+  // Legacy login PIN dialog (for registered name conflict during name-change)
+  const [loginPin, setLoginPin] = useState("");
+  const [loginPinError, setLoginPinError] = useState("");
   const [loginPinLoading, setLoginPinLoading] = useState(false);
   const [pendingLoginName, setPendingLoginName] = useState("");
   const [conflictName, setConflictName] = useState("");
 
-  // Sync nameInput when name prop changes (e.g., from SSE)
+  // Sync nameInput when name prop changes
   useEffect(() => {
     if (name) setNameInput(name);
   }, [name]);
 
-  // Returns true if the name is OK to use, false if blocked (dialog shown)
+  // Reset registration dialog state
+  const openRegisterDialog = (statusToSet: Status) => {
+    setPendingStatus(statusToSet);
+    setNameInput(name || "");
+    setPinInput("");
+    setConfirmPinInput("");
+    setRegError("");
+    setRegMode("register");
+    setShowRegisterDialog(true);
+  };
+
+  // Check if a name is registered or conflicts on this event (used for already-signed-in users changing name)
   const checkNameConflict = async (checkName: string, newStatus: Status): Promise<boolean> => {
     try {
       const params = new URLSearchParams({ name: checkName, participantKey: participantKey || "" });
@@ -57,7 +84,6 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
       if (res.ok) {
         const data = await res.json();
         if (data.registered && !data.isOwner) {
-          // Registered name — require PIN
           setPendingStatus(newStatus);
           setPendingLoginName(checkName);
           setLoginPin("");
@@ -66,7 +92,6 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
           return false;
         }
         if (data.conflict) {
-          // Same name already on this event from a different device
           setPendingStatus(newStatus);
           setConflictName(checkName);
           setShowConflictDialog(true);
@@ -81,17 +106,26 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
 
   const handleStatusClick = async (newStatus: Status) => {
     if (newStatus === status) return;
-    if (!name) {
-      setPendingStatus(newStatus);
-      setShowNameDialog(true);
+
+    // No participantKey → must register first
+    if (!participantKey) {
+      openRegisterDialog(newStatus);
       return;
     }
+
+    // Has key but no name (shouldn't normally happen, but handle it)
+    if (!name) {
+      openRegisterDialog(newStatus);
+      return;
+    }
+
     // Confirm when going from "in" to "maybe" or "out" (clears votes)
     if (status === "in" && newStatus !== "in") {
       setPendingStatus(newStatus);
       setShowConfirmDialog(true);
       return;
     }
+
     // Check for name conflicts when RSVPing with a saved name
     const ok = await checkNameConflict(name, newStatus);
     if (!ok) return;
@@ -105,17 +139,107 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
     onToggle(pendingStatus, name);
   };
 
-  const handleNameSubmit = async () => {
+  // ── Registration / Login submit ──────────────────────────
+  const handleRegisterSubmit = async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
+    if (!/^\d{4}$/.test(pinInput)) {
+      setRegError("PIN must be exactly 4 digits");
+      return;
+    }
 
-    setShowNameDialog(false);
-    const ok = await checkNameConflict(trimmed, pendingStatus);
-    if (!ok) return;
+    if (regMode === "register") {
+      if (pinInput !== confirmPinInput) {
+        setRegError("PINs don't match");
+        return;
+      }
 
-    onToggle(pendingStatus, trimmed);
+      setRegLoading(true);
+      setRegError("");
+
+      try {
+        // First check if the name is already registered
+        const checkRes = await fetch(`/api/participants/check?name=${encodeURIComponent(trimmed)}&participantKey=`);
+        if (checkRes.ok) {
+          const checkData = await checkRes.json();
+          if (checkData.registered) {
+            // Name already registered → switch to login mode
+            setRegMode("login");
+            setConfirmPinInput("");
+            setPinInput("");
+            setRegError("That name is already registered. Enter your PIN to sign in.");
+            setRegLoading(false);
+            return;
+          }
+        }
+
+        // Register new participant
+        const res = await fetch("/api/participants", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmed, pin: pinInput }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (onParticipantKeyChange && data.participantKey) {
+            onParticipantKeyChange(data.participantKey);
+          }
+          if (onNameChange) {
+            onNameChange(trimmed);
+          }
+          setShowRegisterDialog(false);
+          onToggle(pendingStatus, trimmed, data.participantKey);
+        } else {
+          const data = await res.json();
+          if (res.status === 409) {
+            // Name+PIN combo conflict — switch to login
+            setRegMode("login");
+            setConfirmPinInput("");
+            setRegError("That name is already registered. Enter your PIN to sign in.");
+          } else {
+            setRegError(data.error || "Something went wrong");
+          }
+        }
+      } catch {
+        setRegError("Something went wrong, try again");
+      } finally {
+        setRegLoading(false);
+      }
+    } else {
+      // Login mode
+      setRegLoading(true);
+      setRegError("");
+
+      try {
+        const res = await fetch("/api/participants/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: trimmed, pin: pinInput }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (onParticipantKeyChange && data.participantKey) {
+            onParticipantKeyChange(data.participantKey);
+          }
+          if (onNameChange) {
+            onNameChange(data.name || trimmed);
+          }
+          setShowRegisterDialog(false);
+          onToggle(pendingStatus, data.name || trimmed, data.participantKey);
+        } else {
+          setRegError("Wrong PIN. Try again.");
+        }
+      } catch {
+        setRegError("Something went wrong, try again");
+      } finally {
+        setRegLoading(false);
+      }
+    }
   };
 
+  // ── Legacy login PIN (for name conflict on already-signed-in user) ──
   const handleLoginPinSubmit = async () => {
     if (!/^\d{4}$/.test(loginPin)) {
       setLoginPinError("PIN must be exactly 4 digits");
@@ -134,12 +258,11 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
 
       if (res.ok) {
         const data = await res.json();
-        // Swap to the registered participant's key
         if (onParticipantKeyChange && data.participantKey) {
           onParticipantKeyChange(data.participantKey);
         }
         setShowLoginPinDialog(false);
-        onToggle(pendingStatus, pendingLoginName);
+        onToggle(pendingStatus, pendingLoginName, data.participantKey);
       } else {
         setLoginPinError("Wrong PIN. Try again.");
       }
@@ -150,9 +273,35 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
     }
   };
 
+  // ── Edit name (for users who are already registered) ──
   const handleEditName = () => {
     setNameInput(name);
-    setShowNameDialog(true);
+    // For registered users, we re-use the register dialog in a simple name-edit mode
+    // But since they're already registered, just open name dialog
+    // Actually, we keep the old name dialog behavior for name editing
+    setShowRegisterDialog(false);
+    setPendingStatus(status);
+    setNameInput(name);
+    setPinInput("");
+    setConfirmPinInput("");
+    setRegError("");
+    setRegMode("register");
+    // Use a simpler approach: just show the register dialog but it acts as name change
+    // No — for name changes we need the old flow with conflict checking
+    // Let's show a dedicated name-edit approach
+    setShowNameEditDialog(true);
+  };
+
+  // Simple name-edit dialog for already-registered users
+  const [showNameEditDialog, setShowNameEditDialog] = useState(false);
+  const handleNameEditSubmit = async () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    setShowNameEditDialog(false);
+    const ok = await checkNameConflict(trimmed, status);
+    if (!ok) return;
+    if (onNameChange) onNameChange(trimmed);
+    onToggle(status, trimmed);
   };
 
   const handleOpenPinDialog = () => {
@@ -249,7 +398,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
           </button>
         </div>
 
-        {name && !disabled && (
+        {name && participantKey && !disabled && (
           <div className="flex items-center justify-center gap-1.5 mt-2 -mb-1">
             <span className="text-sm text-slate-500">
               Signed in as <span className="font-semibold text-slate-700">{name}</span>
@@ -280,30 +429,106 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
         )}
       </div>
 
-      <Dialog open={showNameDialog} onOpenChange={setShowNameDialog}>
+      {/* Registration / Login dialog (for new users without participantKey) */}
+      <Dialog open={showRegisterDialog} onOpenChange={setShowRegisterDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{name ? "Change your name" : "What\u0027s your name?"}</DialogTitle>
+            <DialogTitle>{regMode === "register" ? "Create your account" : "Sign in"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 pt-2">
             <div>
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="reg-name">Name</Label>
               <Input
-                id="name"
+                id="reg-name"
                 value={nameInput}
                 onChange={(e) => setNameInput(e.target.value)}
                 placeholder="Enter your name"
-                onKeyDown={(e) => e.key === "Enter" && handleNameSubmit()}
+                autoFocus
+                disabled={regLoading}
+              />
+            </div>
+            <div>
+              <Label htmlFor="reg-pin">4-digit PIN</Label>
+              <Input
+                id="reg-pin"
+                type="password"
+                inputMode="numeric"
+                maxLength={4}
+                value={pinInput}
+                onChange={(e) => setPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                placeholder="Choose a 4-digit PIN"
+                onKeyDown={(e) => { if (e.key === "Enter" && regMode === "login") handleRegisterSubmit(); }}
+                disabled={regLoading}
+              />
+            </div>
+            {regMode === "register" && (
+              <div>
+                <Label htmlFor="reg-confirm-pin">Confirm PIN</Label>
+                <Input
+                  id="reg-confirm-pin"
+                  type="password"
+                  inputMode="numeric"
+                  maxLength={4}
+                  value={confirmPinInput}
+                  onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                  placeholder="Re-enter your PIN"
+                  onKeyDown={(e) => e.key === "Enter" && handleRegisterSubmit()}
+                  disabled={regLoading}
+                />
+              </div>
+            )}
+            {regError && (
+              <p className="text-sm text-red-500">{regError}</p>
+            )}
+            <Button
+              onClick={handleRegisterSubmit}
+              className="w-full bg-orange-500 hover:bg-orange-600"
+              disabled={regLoading || !nameInput.trim() || pinInput.length !== 4 || (regMode === "register" && confirmPinInput.length !== 4)}
+            >
+              {regLoading ? (regMode === "register" ? "Creating..." : "Signing in...") : (regMode === "register" ? "Create Account & Join" : "Sign In")}
+            </Button>
+            <button
+              type="button"
+              className="w-full text-sm text-orange-500 hover:text-orange-600 transition-colors"
+              onClick={() => {
+                setRegMode(regMode === "register" ? "login" : "register");
+                setPinInput("");
+                setConfirmPinInput("");
+                setRegError("");
+              }}
+            >
+              {regMode === "register" ? "Already have an account? Sign in" : "New here? Create an account"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Simple name-edit dialog for already-registered users */}
+      <Dialog open={showNameEditDialog} onOpenChange={setShowNameEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change your name</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div>
+              <Label htmlFor="edit-name">Name</Label>
+              <Input
+                id="edit-name"
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                placeholder="Enter your name"
+                onKeyDown={(e) => e.key === "Enter" && handleNameEditSubmit()}
                 autoFocus
               />
             </div>
-            <Button onClick={handleNameSubmit} className="w-full bg-orange-500 hover:bg-orange-600" disabled={!nameInput.trim()}>
-              {name ? "Save" : "Join"}
+            <Button onClick={handleNameEditSubmit} className="w-full bg-orange-500 hover:bg-orange-600" disabled={!nameInput.trim()}>
+              Save
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* Confirm status change dialog (in → maybe/out) */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>
@@ -328,6 +553,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
         </DialogContent>
       </Dialog>
 
+      {/* Change PIN dialog */}
       <Dialog open={showPinDialog} onOpenChange={setShowPinDialog}>
         <DialogContent>
           <DialogHeader>
@@ -374,6 +600,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
         </DialogContent>
       </Dialog>
 
+      {/* Login PIN dialog (for registered name conflict when already signed in) */}
       <Dialog open={showLoginPinDialog} onOpenChange={setShowLoginPinDialog}>
         <DialogContent>
           <DialogHeader>
@@ -411,6 +638,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
         </DialogContent>
       </Dialog>
 
+      {/* Name conflict dialog */}
       <Dialog open={showConflictDialog} onOpenChange={setShowConflictDialog}>
         <DialogContent>
           <DialogHeader>
@@ -438,8 +666,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
               onClick={() => {
                 setShowConflictDialog(false);
                 setNameInput("");
-                setPendingStatus(pendingStatus);
-                setShowNameDialog(true);
+                openRegisterDialog(pendingStatus);
               }}
             >
               Use a different name

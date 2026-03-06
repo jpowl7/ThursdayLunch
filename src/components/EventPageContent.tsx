@@ -28,8 +28,8 @@ interface EventPageContentProps {
 }
 
 export function EventPageContent({ groupSlug }: EventPageContentProps) {
-  const { key: participantKey, setParticipantKey } = useParticipantKey();
-  const { name: savedName, setName: persistName } = useParticipantName();
+  const { key: participantKey, setParticipantKey, clearParticipantKey } = useParticipantKey();
+  const { name: savedName, setName: persistName, clearName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [isOpenGroup, setIsOpenGroup] = useState(false);
@@ -110,14 +110,15 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       availableTo: string | null;
       locationVotes: string[];
       preferredLocationId: string | null;
-    }) => {
-      if (!snapshot?.event || !participantKey) return;
+    }, keyOverride?: string) => {
+      const key = keyOverride || participantKey;
+      if (!snapshot?.event || !key) return;
       try {
         const res = await fetch(`/api/events/${snapshot.event.id}/responses`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            participantKey,
+            participantKey: key,
             ...updates,
           }),
         });
@@ -131,7 +132,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     [snapshot?.event, participantKey]
   );
 
-  const handleToggle = (newStatus: "in" | "out" | "maybe", newName: string) => {
+  const handleToggle = (newStatus: "in" | "out" | "maybe", newName: string, keyOverride?: string) => {
     setStatus(newStatus);
     setName(newName);
     persistName(newName);
@@ -155,7 +156,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       availableTo: newStatus === "in" ? to : availableTo,
       locationVotes: votes,
       preferredLocationId: preferred,
-    });
+    }, keyOverride);
   };
 
   const handleTimeChange = (from: string, to: string) => {
@@ -251,7 +252,8 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             disabled={isFinalized}
             participantKey={participantKey ?? undefined}
             onParticipantKeyChange={setParticipantKey}
-            onSignOut={() => { setName(""); setStatus("out"); persistName(""); }}
+            onNameChange={(newName) => { setName(newName); persistName(newName); }}
+            onSignOut={() => { setName(""); setStatus("out"); clearName(); clearParticipantKey(); }}
             eventId={event.id}
           />
 
@@ -265,17 +267,18 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             <SummaryPanel snapshot={snapshot} showTimeDistribution={false} />
           )}
 
-          {status === "in" && !isFinalized && (
+          {!isFinalized && (status === "in" || locations.length > 0) && (
             <LocationVoting
               locations={locations}
               responses={responses}
-              selectedIds={locationVotes}
-              onVote={handleVote}
-              preferredLocationId={preferredLocationId}
-              onPreference={handlePreference}
+              selectedIds={status === "in" ? locationVotes : []}
+              onVote={status === "in" ? handleVote : () => {}}
+              preferredLocationId={status === "in" ? preferredLocationId : null}
+              onPreference={status === "in" ? handlePreference : () => {}}
               eventId={event.id}
-              participantKey={participantKey ?? undefined}
-              onLocationAdded={refresh}
+              participantKey={status === "in" ? (participantKey ?? undefined) : undefined}
+              onLocationAdded={status === "in" ? refresh : () => {}}
+              disabled={status !== "in"}
             />
           )}
 

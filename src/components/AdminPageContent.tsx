@@ -179,7 +179,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const headerTitle = groupName ? `${groupName} Admin` : "Admin";
 
   return (
-    <>
+    <div className="overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
@@ -301,6 +301,6 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           </div>
         </div>}
       </main>
-    </>
+    </div>
   );
 }

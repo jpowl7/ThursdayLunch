@@ -19,5 +19,10 @@ export function useParticipantName() {
     setNameState(newName);
   }, []);
 
-  return { name, loaded, setName };
+  const clearName = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    setNameState(null);
+  }, []);
+
+  return { name, loaded, setName, clearName };
 }

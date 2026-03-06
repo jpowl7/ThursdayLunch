@@ -20,9 +20,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const [date, setDate] = useState("");
   const [earliestTime, setEarliestTime] = useState("11:30");
   const [latestTime, setLatestTime] = useState("13:30");
-  const [locations, setLocations] = useState<LocationInput[]>([
-    { name: "", placeId: null },
-  ]);
+  const [locations, setLocations] = useState<LocationInput[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,11 +44,6 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
     setError("");
 
     const validLocations = locations.filter((l) => l.name.trim());
-    if (validLocations.length === 0) {
-      setError("Add at least one location");
-      setSubmitting(false);
-      return;
-    }
 
     try {
       const res = await fetch("/api/events", {
