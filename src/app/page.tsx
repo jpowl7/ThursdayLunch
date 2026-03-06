@@ -24,6 +24,16 @@ export default function LandingPage() {
   const [createError, setCreateError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [groups, setGroups] = useState<{ slug: string; name: string; eventCount: number }[]>([]);
+  const [aboutOpen, setAboutOpen] = useState(false);
+
+  // Expand on first visit, collapsed on return visits
+  useEffect(() => {
+    const seen = localStorage.getItem("ili-about-seen");
+    if (!seen) {
+      setAboutOpen(true);
+      localStorage.setItem("ili-about-seen", "1");
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/groups")
@@ -137,6 +147,57 @@ export default function LandingPage() {
                   </div>
                 </div>
               )}
+
+              <div className="pt-4">
+                <button
+                  onClick={() => setAboutOpen(!aboutOpen)}
+                  className="flex items-center justify-between w-full text-left px-1 py-1"
+                >
+                  <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    About I Like Lunch
+                  </h2>
+                  <span className={`material-symbols-outlined text-slate-300 text-[18px] transition-transform ${aboutOpen ? "rotate-180" : ""}`}>
+                    expand_more
+                  </span>
+                </button>
+
+                {aboutOpen && (
+                  <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-4 mt-2 space-y-4">
+                    <div className="text-sm text-slate-600 space-y-2">
+                      <p>
+                        I built this little app to solve a weekly problem my Thursday lunch group kept running into: <span className="italic text-slate-500">Who&apos;s in? What time works? Where are we going?</span>
+                      </p>
+                      <p>
+                        Your group can RSVP, pick a time window that works, vote on (or suggest) places to eat &mdash; and once finalized, everyone sees the who/when/where at a glance.
+                      </p>
+                    </div>
+
+                    <div className="border-t border-slate-100 pt-3 space-y-3">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">FAQ</h3>
+
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">How do I get started?</p>
+                        <p className="text-sm text-slate-500">Join an existing group or create a new one above. Once you&apos;re in, just tap &ldquo;I&apos;m In&rdquo; to RSVP.</p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">Is this free?</p>
+                        <p className="text-sm text-slate-500">Yep, totally free.</p>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-semibold text-slate-700">Have feedback?</p>
+                        <p className="text-sm text-slate-500">
+                          Shoot an email to{" "}
+                          <a href="mailto:gccjason@gmail.com" className="text-orange-500 hover:underline">gccjason@gmail.com</a>
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-400 text-right">&mdash; Jason Powell</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
