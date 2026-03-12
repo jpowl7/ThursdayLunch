@@ -13,7 +13,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const { locations, groupSlug, ...eventInput } = parsed.data;
+    const { locations, groupSlug, delayWindow, delayStartTime, ...eventInput } = parsed.data;
+
+    // Compute random go-live time if delay requested
+    let goLiveAt: string | null = null;
+    let delayStartAt: string | null = null;
+    let delayEndAt: string | null = null;
+    let headsUpAt: string | null = null;
+    if (delayWindow && delayWindow !== "none") {
+      const windowMs = parseInt(delayWindow) * 60 * 1000;
+      const delayMs = Math.floor(Math.random() * windowMs);
+
+      // Use delayStartTime as base if provided, otherwise now
+      // Parse in US Eastern time (Granger, IN) since the time picker is local to the user
+      let baseMs = Date.now();
+      if (delayStartTime && eventInput.date) {
+        const utcGuess = new Date(`${eventInput.date}T${delayStartTime}:00Z`);
+        const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
+        const offsetMs = inEastern.getTime() - utcGuess.getTime();
+        const startDate = new Date(utcGuess.getTime() - offsetMs);
+        if (!isNaN(startDate.getTime())) {
+          baseMs = startDate.getTime();
+        }
+      }
+      goLiveAt = new Date(baseMs + delayMs).toISOString();
+      delayStartAt = new Date(baseMs).toISOString();
+      delayEndAt = new Date(baseMs + windowMs).toISOString();
+      headsUpAt = new Date(baseMs - 5 * 60 * 1000).toISOString(); // 5 min before window start
+    }
 
     const group = await getGroupBySlug(groupSlug);
     if (!group) {
@@ -47,16 +74,20 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const snapshot = await createEvent(eventInput, resolvedLocations, group.id);
+    const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, headsUpAt }, resolvedLocations, group.id);
 
-    after(async () => {
-      await sendPushToGroup(group.id, {
-        title: "Thursday lunch is on!",
-        body: "Vote now.",
-        url: `/g/${groupSlug}`,
-        tag: `event-${snapshot?.event?.id}`,
+    // Send push immediately only for non-delayed events
+    // Delayed events get a heads-up notification via polling (5 min before window)
+    if (!goLiveAt) {
+      after(async () => {
+        await sendPushToGroup(group.id, {
+          title: "Thursday lunch is on!",
+          body: "Vote now.",
+          url: `/g/${groupSlug}`,
+          tag: `event-${snapshot?.event?.id}`,
+        });
       });
-    });
+    }
 
     return NextResponse.json(snapshot, { status: 201 });
   } catch (error) {

@@ -20,7 +20,7 @@ export function FinalizedBanner({ event, locations }: FinalizedBannerProps) {
     <div className="bg-gradient-to-br from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 text-center mb-6 shadow-sm">
       <p className="text-3xl mb-2">🎉</p>
       <h2 className="text-xl font-bold text-orange-800">Lunch is on!</h2>
-      <p className="text-lg mt-2">
+      <p className="text-lg mt-2 break-words">
         <span className="font-bold text-orange-600">{formatTime(event.chosenTime)}</span>
         {chosenLocation && (
           <>

@@ -15,7 +15,7 @@ import { toast } from "sonner";
 type Status = "in" | "out" | "maybe";
 
 interface AttendeeToggleProps {
-  status: Status;
+  status: Status | null;
   name: string;
   onToggle: (status: Status, name: string, participantKeyOverride?: string) => void;
   disabled?: boolean;
@@ -280,7 +280,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
     // But since they're already registered, just open name dialog
     // Actually, we keep the old name dialog behavior for name editing
     setShowRegisterDialog(false);
-    setPendingStatus(status);
+    setPendingStatus(status ?? "in");
     setNameInput(name);
     setPinInput("");
     setConfirmPinInput("");
@@ -296,7 +296,7 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
   const [showNameEditDialog, setShowNameEditDialog] = useState(false);
   const handleNameEditSubmit = async () => {
     const trimmed = nameInput.trim();
-    if (!trimmed) return;
+    if (!trimmed || !status) return;
     setShowNameEditDialog(false);
     const ok = await checkNameConflict(trimmed, status);
     if (!ok) return;

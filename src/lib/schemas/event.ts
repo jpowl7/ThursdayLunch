@@ -28,6 +28,9 @@ export const EventSchema = z.object({
   chosenTime: z.string().nullable(),
   chosenLocationId: z.string().uuid().nullable(),
   createdAt: z.string(),
+  goLiveAt: z.string().nullable(),
+  delayStartAt: z.string().nullable(),
+  delayEndAt: z.string().nullable(),
 });
 
 export const CreateEventSchema = z.object({
@@ -37,6 +40,8 @@ export const CreateEventSchema = z.object({
   latestTime: z.string(),
   locations: z.array(CreateLocationInput),
   groupSlug: z.string().min(1),
+  delayWindow: z.enum(["none", "15", "30", "60", "120"]).optional().default("none"),
+  delayStartTime: z.string().optional(),
 });
 
 export const AddLocationSchema = z.object({

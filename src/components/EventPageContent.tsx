@@ -57,6 +57,18 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       .catch(() => setLoading(false));
   }, [apiUrl]);
 
+  // Poll every 30s when there's no event (triggers notification checks server-side)
+  useEffect(() => {
+    if (initialSnapshot || loading) return;
+    const interval = setInterval(() => {
+      fetch(apiUrl)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (data) setInitialSnapshot(data); })
+        .catch(() => {});
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [initialSnapshot, loading, apiUrl]);
+
   const eventId = initialSnapshot?.event?.id || null;
   const { snapshot: liveSnapshot, connectionState, refresh } = useEventStream(eventId, groupSlug);
   const snapshot = liveSnapshot || initialSnapshot;
@@ -67,7 +79,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     (r) => r.participantKey === participantKey
   );
 
-  const [status, setStatus] = useState<"in" | "out" | "maybe">("out");
+  const [status, setStatus] = useState<"in" | "out" | "maybe" | null>(null);
   const [name, setName] = useState(savedName || "");
   const [availableFrom, setAvailableFrom] = useState<string | null>(null);
   const [availableTo, setAvailableTo] = useState<string | null>(null);
@@ -160,12 +172,14 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
   };
 
   const handleTimeChange = (from: string, to: string) => {
+    if (!status) return;
     setAvailableFrom(from);
     setAvailableTo(to);
     submitResponse({ status, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId });
   };
 
   const handleVote = (newVotes: string[]) => {
+    if (!status) return;
     // Auto-clear preference if the preferred location is being un-voted
     const newPreferred = preferredLocationId && newVotes.includes(preferredLocationId)
       ? preferredLocationId
@@ -176,6 +190,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
   };
 
   const handlePreference = (locationId: string | null) => {
+    if (!status) return;
     setPreferredLocationId(locationId);
     submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId });
   };

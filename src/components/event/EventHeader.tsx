@@ -47,7 +47,7 @@ export function EventHeader({ event, shareButton }: EventHeaderProps) {
         </div>
         {shareButton}
       </div>
-      <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+      <h1 className="text-2xl font-bold tracking-tight text-slate-900 break-words">
         {event.title}
       </h1>
     </div>

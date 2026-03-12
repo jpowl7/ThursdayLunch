@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
-import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse } from "@/lib/db/queries";
+import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse, getResponseByKey } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 
 export async function PUT(
@@ -35,25 +35,34 @@ export async function PUT(
       );
     }
 
+    // Check existing status before upserting to avoid spamming notifications
+    const existing = await getResponseByKey(id, participantKey);
+    const previousStatus = existing?.status ?? null;
+
     const response = await upsertResponse(id, participantKey, input);
 
-    const statusMessages: Record<string, string> = {
-      in: `${input.name} is in!`,
-      maybe: `${input.name} is a maybe`,
-      out: `${input.name} is out`,
-    };
+    // Only send push when status actually changes (or first response)
+    const statusChanged = previousStatus !== input.status;
 
-    after(async () => {
-      const group = await getGroupByEventId(id);
-      if (group) {
-        await sendPushToGroup(group.id, {
-          title: "RSVP Update",
-          body: statusMessages[input.status],
-          url: `/g/${group.slug}`,
-          tag: `rsvp-${id}`,
-        }, participantKey);
-      }
-    });
+    if (statusChanged) {
+      const statusMessages: Record<string, string> = {
+        in: `${input.name} is in!`,
+        maybe: `${input.name} is a maybe`,
+        out: `${input.name} is out`,
+      };
+
+      after(async () => {
+        const group = await getGroupByEventId(id);
+        if (group) {
+          await sendPushToGroup(group.id, {
+            title: "RSVP Update",
+            body: statusMessages[input.status],
+            url: `/g/${group.slug}`,
+            tag: `rsvp-${id}-${participantKey}`,
+          }, participantKey);
+        }
+      });
+    }
 
     return NextResponse.json(response);
   } catch (error) {

@@ -70,24 +70,21 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
   const maxCount = Math.max(...timeSlots.map((s) => s.count), 1);
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4">
+    <div className="bg-white rounded-xl p-4 border border-orange-500/10 shadow-sm space-y-4 overflow-hidden">
       <h3 className="text-sm font-semibold uppercase tracking-wider text-orange-500">Response Stats</h3>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50">
-          <span className="material-symbols-outlined text-green-600 text-[20px]">sentiment_satisfied</span>
-          <span className="text-2xl font-bold text-green-600">{inResponses.length}</span>
-          <span className="text-sm text-green-600 font-medium">Going</span>
+      <div className="grid grid-cols-3 gap-2">
+        <div className="flex items-center justify-center gap-1 py-2 rounded-lg bg-green-50 min-w-0 overflow-hidden">
+          <span className="text-xl font-bold text-green-600">{inResponses.length}</span>
+          <span className="text-xs text-green-600 font-medium">Going</span>
         </div>
-        <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-amber-50">
-          <span className="material-symbols-outlined text-amber-500 text-[20px]">help</span>
-          <span className="text-2xl font-bold text-amber-500">{responses.filter((r) => r.status === "maybe").length}</span>
-          <span className="text-sm text-amber-500 font-medium">Maybe</span>
+        <div className="flex items-center justify-center gap-1 py-2 rounded-lg bg-amber-50 min-w-0 overflow-hidden">
+          <span className="text-xl font-bold text-amber-500">{responses.filter((r) => r.status === "maybe").length}</span>
+          <span className="text-xs text-amber-500 font-medium">Maybe</span>
         </div>
-        <div className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-red-50">
-          <span className="material-symbols-outlined text-red-400 text-[20px]">sentiment_dissatisfied</span>
-          <span className="text-2xl font-bold text-red-400">{responses.filter((r) => r.status === "out").length}</span>
-          <span className="text-sm text-red-400 font-medium">Out</span>
+        <div className="flex items-center justify-center gap-1 py-2 rounded-lg bg-red-50 min-w-0 overflow-hidden">
+          <span className="text-xl font-bold text-red-400">{responses.filter((r) => r.status === "out").length}</span>
+          <span className="text-xs text-red-400 font-medium">Out</span>
         </div>
       </div>
 
@@ -104,13 +101,13 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
       )}
 
       {topLocation && topVotes > 0 && (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
             <span className="material-symbols-outlined text-sm">restaurant</span>
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-slate-500 text-xs">Most Voted</p>
-            <p className="font-bold">
+            <p className="font-bold truncate">
               {topLocation.name}
               <span className="text-orange-500 font-medium text-sm ml-1">
                 ({topVotes} {topVotes === 1 ? "vote" : "votes"})
@@ -128,13 +125,13 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
         const starCount = starLead ? prefCounts.get(starLead.id) || 0 : 0;
         if (!starLead) return null;
         return (
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0">
               <span className="material-symbols-outlined text-sm">star</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-slate-500 text-xs">Most Starred</p>
-              <p className="font-bold">
+              <p className="font-bold truncate">
                 {starLead.name}
                 <span className="text-yellow-600 font-medium text-sm ml-1">
                   ({starCount} {starCount === 1 ? "star" : "stars"})
@@ -148,7 +145,7 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
       {showTimeDistribution && timeSlots.length > 0 && (
         <div>
           <p className="text-slate-500 text-xs mb-2">Time Distribution</p>
-          <div className="flex items-end gap-1 h-16">
+          <div className="flex items-end gap-0.5 h-16 overflow-hidden">
             {timeSlots.map((slot) => (
               <div key={slot.time} className="flex-1 flex flex-col items-center">
                 <div
@@ -175,11 +172,11 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
               const prefs = prefCounts.get(loc.id) || 0;
               const pct = inResponses.length > 0 ? (count / inResponses.length) * 100 : 0;
               return (
-                <div key={loc.id} className="flex items-center gap-3">
-                  <div className="flex-1">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="font-medium">{loc.name}</span>
-                      <span className="text-slate-400 text-xs flex items-center gap-0.5">
+                <div key={loc.id} className="flex items-center gap-3 min-w-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between text-sm mb-1 gap-2">
+                      <span className="font-medium truncate min-w-0">{loc.name}</span>
+                      <span className="text-slate-400 text-xs flex items-center gap-0.5 shrink-0">
                         <span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span>
                         {count}{prefs > 0 && <>&nbsp;· <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>{prefs}</>}
                       </span>

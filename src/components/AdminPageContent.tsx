@@ -13,6 +13,13 @@ import { toast } from "sonner";
 import Link from "next/link";
 import type { EventSnapshot } from "@/types";
 
+function formatTime(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  const period = h >= 12 ? "PM" : "AM";
+  const displayH = h > 12 ? h - 12 : h === 0 ? 12 : h;
+  return `${displayH}:${m.toString().padStart(2, "0")} ${period}`;
+}
+
 interface AdminPageContentProps {
   groupSlug: string;
 }
@@ -24,8 +31,12 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [isOpenGroup, setIsOpenGroup] = useState(false);
+
+  // Scheduled event state
+  const [scheduledSnapshot, setScheduledSnapshot] = useState<(EventSnapshot & { scheduled: boolean }) | null>(null);
 
   // Change passcode state
   const [newPasscode, setNewPasscode] = useState("");
@@ -40,13 +51,25 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       if (res.ok) {
         const data = await res.json();
         setInitialSnapshot(data);
+        setScheduledSnapshot(null);
+      } else {
+        setInitialSnapshot(null);
+        // No live event — check for scheduled
+        const schedRes = await fetch(
+          `/api/events/scheduled?group=${encodeURIComponent(groupSlug)}`,
+          { headers: { Authorization: `Bearer ${activePasscode}` } }
+        );
+        if (schedRes.ok) {
+          const schedData = await schedRes.json();
+          setScheduledSnapshot(schedData?.scheduled ? schedData : null);
+        }
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
-  }, [activePasscode, isOpenGroup, apiUrl]);
+  }, [activePasscode, isOpenGroup, apiUrl, groupSlug]);
 
   // Fetch group info — auto-authorize if no passcode required
   useEffect(() => {
@@ -72,11 +95,33 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
     }
   }, [activePasscode, fetchData]);
 
-  const handlePasscodeSubmit = () => {
+  // Poll while a scheduled event is waiting to go live
+  useEffect(() => {
+    if (!scheduledSnapshot) return;
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
+  }, [scheduledSnapshot, fetchData]);
+
+  const handlePasscodeSubmit = async () => {
     const trimmed = passcodeInput.trim();
-    if (trimmed) {
-      setActivePasscode(trimmed);
-      setLoading(true);
+    if (!trimmed) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/groups/${groupSlug}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode: trimmed }),
+      });
+      const data = await res.json();
+      if (data.valid) {
+        setActivePasscode(trimmed);
+      } else {
+        toast.error("Wrong passcode");
+        setLoading(false);
+      }
+    } catch {
+      toast.error("Network error");
+      setLoading(false);
     }
   };
 
@@ -99,6 +144,29 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       toast.error("Network error");
     } finally {
       setReopening(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    const eventToCancel = snapshot?.event || scheduledSnapshot?.event;
+    if (!eventToCancel || !confirm("Cancel this event? All responses will be kept but the event will end.")) return;
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/events/${eventToCancel.id}/cancel`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${activePasscode}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to cancel");
+        return;
+      }
+      toast.success("Event cancelled");
+      fetchData();
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -179,19 +247,20 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const headerTitle = groupName ? `${groupName} Admin` : "Admin";
 
   return (
-    <div className="overflow-x-hidden">
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
-          <h1 className="text-lg font-bold tracking-tight">{headerTitle}</h1>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/" className="text-sm text-slate-400 hover:text-orange-500 transition-colors">Home</Link>
-          <a href={`/g/${groupSlug}`} className="text-sm text-slate-400 hover:text-orange-500 transition-colors">View group</a>
-        </div>
-      </header>
+    <div className="flex justify-center min-h-screen">
+      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
+        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="material-symbols-outlined text-orange-500 shrink-0">lunch_dining</span>
+            <h1 className="text-lg font-bold tracking-tight truncate">{headerTitle}</h1>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            <Link href="/" className="text-sm text-slate-400 hover:text-orange-500 transition-colors whitespace-nowrap">Home</Link>
+            <a href={`/g/${groupSlug}`} className="text-sm text-slate-400 hover:text-orange-500 transition-colors whitespace-nowrap">Group</a>
+          </div>
+        </header>
 
-      <main className="max-w-[430px] mx-auto p-4 space-y-6 pb-12">
+        <div className="px-4 pb-12 pt-4 space-y-6">
         {isOpenGroup && (
           <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
             <span className="material-symbols-outlined text-purple-500 text-[20px]">science</span>
@@ -201,7 +270,51 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           </div>
         )}
 
-        {!snapshot ? (
+        {!snapshot && scheduledSnapshot ? (
+          <div className="pt-2 space-y-4">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-amber-500">schedule</span>
+                  <h3 className="font-bold text-amber-800">Event Scheduled</h3>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-amber-800">{scheduledSnapshot.event.title}</p>
+                <p className="text-sm text-amber-700">
+                  {(() => {
+                    const d = new Date(scheduledSnapshot.event.date.includes("T") ? scheduledSnapshot.event.date : scheduledSnapshot.event.date + "T12:00:00");
+                    return isNaN(d.getTime()) ? scheduledSnapshot.event.date : d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+                  })()}
+                  {" · "}
+                  {scheduledSnapshot.event.earliestTime && scheduledSnapshot.event.latestTime && (
+                    <>{formatTime(scheduledSnapshot.event.earliestTime)} – {formatTime(scheduledSnapshot.event.latestTime)}</>
+                  )}
+                </p>
+                <p className="text-sm text-amber-700">
+                  Goes live at{" "}
+                  <strong>{new Date(scheduledSnapshot.event.goLiveAt!).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</strong>
+                </p>
+                {scheduledSnapshot.locations.length > 0 && (
+                  <p className="text-xs text-amber-600 pt-1">
+                    {scheduledSnapshot.locations.length} location{scheduledSnapshot.locations.length !== 1 ? "s" : ""}: {scheduledSnapshot.locations.map(l => l.name).join(", ")}
+                  </p>
+                )}
+              </div>
+              <p className="text-xs text-amber-500">
+                Participants won&apos;t see it until then. Push notifications will be sent automatically.
+              </p>
+            </div>
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="w-full border border-red-200 text-red-400 font-medium py-2.5 rounded-full hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 text-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">cancel</span>
+              {cancelling ? "Cancelling..." : "Cancel Scheduled Event"}
+            </button>
+          </div>
+        ) : !snapshot ? (
           <div className="pt-2">
             <CreateEventForm token={activePasscode!} onCreated={fetchData} groupSlug={groupSlug} />
           </div>
@@ -269,6 +382,17 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               />
             </div>
 
+            {snapshot.event.status === "open" && (
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="w-full border border-red-200 text-red-400 font-medium py-2.5 rounded-full hover:bg-red-50 disabled:opacity-50 transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <span className="material-symbols-outlined text-[18px]">cancel</span>
+                {cancelling ? "Cancelling..." : "Cancel Event"}
+              </button>
+            )}
+
             {snapshot.event.status !== "open" && (
               <div className="pt-4">
                 <CreateEventForm token={activePasscode!} onCreated={fetchData} groupSlug={groupSlug} />
@@ -300,6 +424,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
             </button>
           </div>
         </div>}
+        </div>
       </main>
     </div>
   );

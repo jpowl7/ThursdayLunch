@@ -21,6 +21,9 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const [earliestTime, setEarliestTime] = useState("11:30");
   const [latestTime, setLatestTime] = useState("13:30");
   const [locations, setLocations] = useState<LocationInput[]>([]);
+  const [delayEnabled, setDelayEnabled] = useState(false);
+  const [delayWindow, setDelayWindow] = useState("30");
+  const [delayStartTime, setDelayStartTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -58,6 +61,8 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           earliestTime,
           latestTime,
           groupSlug,
+          delayWindow: delayEnabled ? delayWindow : "none",
+          delayStartTime: delayEnabled && delayStartTime ? delayStartTime : undefined,
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             placeId: l.placeId || undefined,
@@ -128,6 +133,51 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
               className={inputClass}
             />
           </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 px-1">
+            <input
+              type="checkbox"
+              id="delay-toggle"
+              checked={delayEnabled}
+              onChange={(e) => setDelayEnabled(e.target.checked)}
+              className="w-4 h-4 accent-orange-500"
+            />
+            <Label htmlFor="delay-toggle" className="text-sm font-medium cursor-pointer">
+              Random go-live delay
+            </Label>
+          </div>
+          {delayEnabled && (
+            <div className="ml-7 space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-500">Start delay at</Label>
+                <input
+                  type="time"
+                  value={delayStartTime}
+                  onChange={(e) => setDelayStartTime(e.target.value)}
+                  placeholder="Now"
+                  className={inputClass}
+                />
+                <p className="text-xs text-slate-400">
+                  {delayStartTime ? "Delay timer begins at this time" : "Leave blank to start immediately"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs font-medium text-slate-500">Random window</Label>
+                <select
+                  value={delayWindow}
+                  onChange={(e) => setDelayWindow(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="15">Up to 15 minutes</option>
+                  <option value="30">Up to 30 minutes</option>
+                  <option value="60">Up to 1 hour</option>
+                  <option value="120">Up to 2 hours</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">

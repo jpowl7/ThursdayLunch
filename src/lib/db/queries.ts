@@ -43,6 +43,12 @@ export async function getGroupByEventId(eventId: string) {
   return rows[0] ? mapGroup(rows[0]) : null;
 }
 
+export async function getAllGroupIds() {
+  const sql = getDb();
+  const rows = await sql`SELECT id, slug FROM groups`;
+  return rows.map((r) => ({ id: r.id as string, slug: r.slug as string }));
+}
+
 export async function listGroups() {
   const sql = getDb();
   const rows = await sql`
@@ -113,7 +119,42 @@ export async function updateParticipantPin(participantKey: string, currentPin: s
 
 export async function getCurrentEvent(groupId: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} AND (go_live_at IS NULL OR go_live_at <= NOW()) AND created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 1`;
+  return rows[0] || null;
+}
+
+export async function getScheduledEvent(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM events
+    WHERE status = 'open' AND group_id = ${groupId}
+      AND go_live_at IS NOT NULL AND go_live_at > NOW()
+    ORDER BY created_at DESC LIMIT 1
+  `;
+  return rows[0] || null;
+}
+
+export async function claimGoLiveNotifications(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events SET notifications_sent = TRUE
+    WHERE group_id = ${groupId} AND status = 'open'
+      AND go_live_at IS NOT NULL AND go_live_at <= NOW()
+      AND notifications_sent = FALSE
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function claimHeadsUpNotifications(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events SET heads_up_sent = TRUE
+    WHERE group_id = ${groupId} AND status = 'open'
+      AND heads_up_at IS NOT NULL AND heads_up_at <= NOW()
+      AND heads_up_sent = FALSE
+    RETURNING *
+  `;
   return rows[0] || null;
 }
 
@@ -146,7 +187,10 @@ export async function getEventSnapshot(eventId: string) {
 }
 
 export async function createEvent(
-  input: { title: string; date: string; earliestTime: string; latestTime: string },
+  input: {
+    title: string; date: string; earliestTime: string; latestTime: string;
+    goLiveAt?: string | null; delayStartAt?: string | null; delayEndAt?: string | null; headsUpAt?: string | null;
+  },
   locations: { name: string; address?: string; mapsUrl?: string; websiteUrl?: string }[],
   groupId: string
 ) {
@@ -155,9 +199,11 @@ export async function createEvent(
   // Close any open events in the same group
   await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open' AND group_id = ${groupId}`;
 
+  const notificationsSent = !input.goLiveAt;
+  const headsUpSent = !input.headsUpAt;
   const eventRows = await sql`
-    INSERT INTO events (title, date, earliest_time, latest_time, group_id)
-    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId})
+    INSERT INTO events (title, date, earliest_time, latest_time, group_id, go_live_at, notifications_sent, heads_up_at, heads_up_sent, delay_start_at, delay_end_at)
+    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId}, ${input.goLiveAt || null}, ${notificationsSent}, ${input.headsUpAt || null}, ${headsUpSent}, ${input.delayStartAt || null}, ${input.delayEndAt || null})
     RETURNING *
   `;
 
@@ -183,6 +229,15 @@ export async function hasConflictingResponse(eventId: string, participantKey: st
     LIMIT 1
   `;
   return rows.length > 0;
+}
+
+export async function getResponseByKey(eventId: string, participantKey: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM responses
+    WHERE event_id = ${eventId} AND participant_key = ${participantKey}
+  `;
+  return rows[0] ?? null;
 }
 
 export async function upsertResponse(
@@ -348,6 +403,17 @@ export async function reopenEvent(id: string) {
   return rows[0] || null;
 }
 
+export async function cancelEvent(id: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events
+    SET status = 'cancelled'
+    WHERE id = ${id}
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
 // ── Leaderboard queries ──────────────────────────────────────
 
 export async function getPastLunches(groupId: string, limit = 10) {
@@ -367,7 +433,7 @@ export async function getPastLunches(groupId: string, limit = 10) {
   const attendees = await sql`
     SELECT r.event_id, r.name
     FROM responses r
-    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in'
+    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in' AND r.no_show IS NOT TRUE
     ORDER BY r.created_at
   `;
 
@@ -512,7 +578,7 @@ export async function getLeaderboardSpeedDemon(groupId: string) {
     FROM responses r
     JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
     WHERE r.status = 'in'
-      AND r.created_at <= e.created_at + INTERVAL '5 minutes'
+      AND r.created_at <= COALESCE(e.go_live_at, e.created_at) + INTERVAL '5 minutes'
     GROUP BY LOWER(r.name)
     ORDER BY count DESC, name
     LIMIT 10
@@ -714,6 +780,9 @@ function mapEvent(row: Record<string, unknown>) {
     chosenLocationId: row.chosen_location_id ? String(row.chosen_location_id) : null,
     groupId: row.group_id as string,
     createdAt: String(row.created_at),
+    goLiveAt: row.go_live_at ? String(row.go_live_at) : null,
+    delayStartAt: row.delay_start_at ? String(row.delay_start_at) : null,
+    delayEndAt: row.delay_end_at ? String(row.delay_end_at) : null,
   };
 }
 

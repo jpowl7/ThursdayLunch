@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getGroupBySlug, updateGroupPasscode } from "@/lib/db/queries";
+import { getGroupBySlug, updateGroupPasscode, verifyGroupPasscode } from "@/lib/db/queries";
 
 export async function GET(
   _request: NextRequest,
@@ -15,6 +15,22 @@ export async function GET(
     return NextResponse.json({ slug: group.slug, name: group.name, requiresPasscode: group.passcode !== "" });
   } catch (error) {
     console.error("Error fetching group:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ slug: string }> }
+) {
+  try {
+    const { slug } = await params;
+    const body = await request.json();
+    const passcode = typeof body.passcode === "string" ? body.passcode : "";
+    const valid = await verifyGroupPasscode(slug, passcode);
+    return NextResponse.json({ valid: !!valid });
+  } catch (error) {
+    console.error("Error verifying passcode:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
