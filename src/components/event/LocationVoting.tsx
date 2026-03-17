@@ -378,7 +378,7 @@ export function LocationVoting({
                     className="flex-shrink-0 p-0.5 rounded-full transition-all"
                     title="Veto this location"
                   >
-                    <span className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-400">block</span>
+                    <span className="material-symbols-outlined text-[14px] text-slate-300 hover:text-red-400">block</span>
                   </button>
                 )}
 

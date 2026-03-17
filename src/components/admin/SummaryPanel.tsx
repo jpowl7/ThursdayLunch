@@ -140,7 +140,7 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
             <div className="flex items-baseline gap-2 mb-2">
               <p className="text-slate-500 text-xs">Location Votes</p>
               <p className="text-xs text-orange-400">
-                <span className="material-symbols-outlined filled text-[10px] align-middle">thumb_up</span> = 1pt &middot; <span className="material-symbols-outlined filled text-[10px] align-middle text-yellow-500">star</span> = 2pts &middot; <span className="material-symbols-outlined text-[10px] align-middle text-red-400">block</span> = vetoed
+                <span className="material-symbols-outlined filled text-[10px] align-middle">thumb_up</span> = 1pt &middot; <span className="material-symbols-outlined filled text-[10px] align-middle text-yellow-500">star</span> = 2pts
               </p>
             </div>
             <div className="space-y-2">
