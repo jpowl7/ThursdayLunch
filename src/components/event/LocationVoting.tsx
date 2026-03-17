@@ -334,8 +334,8 @@ export function LocationVoting({
                     <span className="text-xs font-bold text-slate-500">{count}</span>
                     {prefs > 0 && (
                       <>
-                        <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>
-                        <span className="text-xs font-bold text-yellow-500">{prefs}</span>
+                        <span className="material-symbols-outlined text-[12px] text-slate-300">star</span>
+                        <span className="text-xs font-bold text-slate-500">{prefs}</span>
                       </>
                     )}
                   </div>
