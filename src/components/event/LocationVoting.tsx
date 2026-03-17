@@ -24,7 +24,7 @@ interface LocationVotingProps {
   selectedIds: string[];
   onVote: (locationIds: string[]) => void;
   preferredLocationId?: string | null;
-  onPreference?: (locationId: string | null) => void;
+  onPreference?: (locationId: string | null, autoVoteLocationId?: string) => void;
   vetoLocationId?: string | null;
   vetoReason?: string | null;
   onVeto?: (locationId: string, reason: string) => void;
@@ -240,8 +240,8 @@ export function LocationVoting({
           Where?
         </h3>
         <span className="text-[11px] text-slate-400 flex items-center gap-2">
-          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span> I&apos;d eat here</span>
-          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span> my preference</span>
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span> vote</span>
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span> favorite</span>
         </span>
       </div>
       <div className="space-y-2">
@@ -257,30 +257,14 @@ export function LocationVoting({
           return (
             <div key={loc.id}>
               <div
-                onClick={() => !isEliminated && toggleLocation(loc.id)}
                 className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
                   isEliminated
-                    ? "bg-slate-50 border border-slate-100 opacity-60 cursor-default"
+                    ? "bg-slate-50 border border-slate-100 opacity-60"
                     : isSelected
-                      ? "bg-white border-2 border-orange-500 shadow-sm shadow-orange-500/10 cursor-pointer"
-                      : `bg-white border border-slate-100 shadow-sm ${disabled ? "opacity-60 cursor-default" : "hover:border-orange-500/50 cursor-pointer"}`
+                      ? "bg-white border-2 border-orange-500 shadow-sm shadow-orange-500/10"
+                      : `bg-white border border-slate-100 shadow-sm ${disabled ? "opacity-60" : ""}`
                 }`}
               >
-                {/* Check / empty circle / veto icon */}
-                {isEliminated ? (
-                  <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-red-100 text-red-500" title={vetoes.map((v) => `${v.name}: ${v.reason}`).join("\n")}>
-                    <span className="material-symbols-outlined text-[16px]">block</span>
-                  </div>
-                ) : (
-                  <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                    isSelected ? "bg-orange-500 text-white" : "border-2 border-slate-200"
-                  }`}>
-                    {isSelected && (
-                      <span className="material-symbols-outlined text-[16px] font-bold">check</span>
-                    )}
-                  </div>
-                )}
-
                 {/* Favicon */}
                 {loc.websiteUrl && (() => {
                   try {
@@ -325,20 +309,46 @@ export function LocationVoting({
                   )}
                 </div>
 
-                {/* Vote count + prefs (hidden when eliminated) */}
+                {/* Thumbs up button + count */}
                 {!isEliminated && (
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-300"}`}>
+                  <button
+                    type="button"
+                    onClick={() => toggleLocation(loc.id)}
+                    disabled={disabled}
+                    className="flex items-center gap-0.5 flex-shrink-0 p-1 rounded-lg transition-all disabled:cursor-default"
+                    title={isSelected ? "Remove vote" : "Vote for this"}
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isSelected ? "filled text-orange-500" : "text-slate-300 hover:text-orange-400"}`}>
                       thumb_up
                     </span>
                     <span className="text-xs font-bold text-slate-500">{count}</span>
+                  </button>
+                )}
+
+                {/* Star button + count (always visible, clickable) */}
+                {!isEliminated && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (disabled) return;
+                      if (isPreferred) {
+                        onPreference?.(null);
+                      } else {
+                        // Star — auto-vote if not already voted (single combined call)
+                        onPreference?.(loc.id, isSelected ? undefined : loc.id);
+                      }
+                    }}
+                    disabled={disabled}
+                    className="flex items-center gap-0.5 flex-shrink-0 p-1 rounded-lg transition-all disabled:cursor-default"
+                    title={isPreferred ? "Remove top pick" : "Set as top pick"}
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isPreferred ? "filled text-yellow-500" : "text-slate-300 hover:text-yellow-400"}`}>
+                      star
+                    </span>
                     {prefs > 0 && (
-                      <>
-                        <span className="material-symbols-outlined text-[12px] text-slate-300">star</span>
-                        <span className="text-xs font-bold text-slate-500">{prefs}</span>
-                      </>
+                      <span className="text-xs font-bold text-slate-500">{prefs}</span>
                     )}
-                  </div>
+                  </button>
                 )}
 
                 {/* Veto count badge for eliminated locations */}
@@ -349,29 +359,11 @@ export function LocationVoting({
                   </div>
                 )}
 
-                {/* Star button for preference */}
-                {isSelected && onPreference && !isEliminated && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPreference(isPreferred ? null : loc.id);
-                    }}
-                    className="flex-shrink-0 p-0.5 rounded-full transition-all"
-                    title={isPreferred ? "Remove top pick" : "Set as top pick"}
-                  >
-                    <span className={`material-symbols-outlined text-[18px] ${isPreferred ? "filled text-yellow-500" : "text-slate-300 hover:text-yellow-400"}`}>
-                      star
-                    </span>
-                  </button>
-                )}
-
                 {/* Veto button (non-eliminated, status=in) */}
                 {!isEliminated && !disabled && onVeto && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setVetoingLocationId(vetoingLocationId === loc.id ? null : loc.id);
                       setVetoReasonInput("");
                     }}
@@ -386,10 +378,7 @@ export function LocationVoting({
                 {isMyVeto && onClearVeto && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClearVeto();
-                    }}
+                    onClick={() => onClearVeto()}
                     className="flex-shrink-0 px-2 py-0.5 text-[11px] font-medium text-red-500 hover:text-red-700 border border-red-200 rounded-full transition-all"
                     title="Remove your veto"
                   >
@@ -414,7 +403,7 @@ export function LocationVoting({
 
               {/* Inline veto reason input */}
               {vetoingLocationId === loc.id && (
-                <div className="flex gap-2 mt-1 ml-9">
+                <div className="flex gap-2 mt-1 ml-3">
                   <input
                     type="text"
                     value={vetoReasonInput}

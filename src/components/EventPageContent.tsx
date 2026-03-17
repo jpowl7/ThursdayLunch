@@ -205,10 +205,16 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred, vetoLocationId: newVeto, vetoReason: newVetoReason });
   };
 
-  const handlePreference = (locationId: string | null) => {
+  const handlePreference = (locationId: string | null, autoVoteLocationId?: string) => {
     if (!status) return;
+    // If starring auto-votes, include the new vote in the same submit
+    let newVotes = locationVotes;
+    if (autoVoteLocationId && !locationVotes.includes(autoVoteLocationId)) {
+      newVotes = [...locationVotes, autoVoteLocationId];
+      setLocationVotes(newVotes);
+    }
     setPreferredLocationId(locationId);
-    submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId, vetoLocationId, vetoReason });
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: locationId, vetoLocationId, vetoReason });
   };
 
   const handleVeto = (locationId: string, reason: string) => {
