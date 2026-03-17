@@ -8,6 +8,7 @@ import { FinalizeControls } from "@/components/admin/FinalizeControls";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
 import { AdminLocationManager } from "@/components/admin/AdminLocationManager";
 import { AdminResponseManager } from "@/components/admin/AdminResponseManager";
+import { PlacesAutocomplete } from "@/components/PlacesAutocomplete";
 import { useEventStream } from "@/hooks/useEventStream";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -41,6 +42,13 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   // Change passcode state
   const [newPasscode, setNewPasscode] = useState("");
   const [changingPasscode, setChangingPasscode] = useState(false);
+
+  // Group location state
+  const [groupLocationName, setGroupLocationName] = useState<string | null>(null);
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationSearch, setLocationSearch] = useState("");
+  const [selectedLocationPlaceId, setSelectedLocationPlaceId] = useState<string | null>(null);
+  const [savingLocation, setSavingLocation] = useState(false);
 
   const apiUrl = `/api/events/current?group=${encodeURIComponent(groupSlug)}`;
 
@@ -77,6 +85,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.name) setGroupName(data.name);
+        if (data?.locationName) setGroupLocationName(data.locationName);
         if (data?.requiresPasscode === false) {
           setIsOpenGroup(true);
           setActivePasscode("");
@@ -400,6 +409,100 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
             )}
           </>
         )}
+
+        {/* Group Location Section */}
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Group Location</h3>
+          <p className="text-sm text-slate-600">
+            Restaurant search results are biased toward:{" "}
+            <span className="font-semibold">{groupLocationName || "Granger, IN (default)"}</span>
+          </p>
+          {!editingLocation ? (
+            <button
+              type="button"
+              onClick={() => setEditingLocation(true)}
+              className="text-sm text-orange-500 font-semibold hover:text-orange-600 transition-colors"
+            >
+              Change
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <PlacesAutocomplete
+                value={locationSearch}
+                onChange={(name, placeId) => {
+                  setLocationSearch(name);
+                  setSelectedLocationPlaceId(placeId);
+                }}
+                placeholder="Search for a city or area…"
+                groupSlug={groupSlug}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (!selectedLocationPlaceId) {
+                      toast.error("Select a location from the suggestions");
+                      return;
+                    }
+                    setSavingLocation(true);
+                    try {
+                      // Get place details for lat/lng
+                      const detailsRes = await fetch(`/api/places/details?placeId=${encodeURIComponent(selectedLocationPlaceId)}`);
+                      if (!detailsRes.ok) {
+                        toast.error("Could not resolve location");
+                        return;
+                      }
+                      const details = await detailsRes.json();
+
+                      const res = await fetch(`/api/groups/${groupSlug}/location`, {
+                        method: "PATCH",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: `Bearer ${activePasscode}`,
+                        },
+                        body: JSON.stringify({
+                          lat: details.lat,
+                          lng: details.lng,
+                          name: locationSearch,
+                        }),
+                      });
+                      if (res.ok) {
+                        const data = await res.json();
+                        setGroupLocationName(data.locationName);
+                        setEditingLocation(false);
+                        setLocationSearch("");
+                        setSelectedLocationPlaceId(null);
+                        toast.success("Group location updated!");
+                      } else {
+                        const data = await res.json();
+                        toast.error(data.error || "Failed to update");
+                      }
+                    } catch {
+                      toast.error("Network error");
+                    } finally {
+                      setSavingLocation(false);
+                    }
+                  }}
+                  disabled={savingLocation || !selectedLocationPlaceId}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                >
+                  {savingLocation ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingLocation(false);
+                    setLocationSearch("");
+                    setSelectedLocationPlaceId(null);
+                  }}
+                  className="px-4 py-2 text-sm font-semibold rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Change Passcode Section — hidden for open/demo groups */}
         {!isOpenGroup && <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">

@@ -27,9 +27,26 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
     }
   }
 
-  // Default to most-voted location
-  const topLocationId = [...locations].sort(
-    (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
+  // Collect vetoed location IDs from "in" responses
+  const vetoedLocationIds = new Set<string>();
+  for (const r of inResponses) {
+    if (r.vetoLocationId) vetoedLocationIds.add(r.vetoLocationId);
+  }
+
+  // Filter out vetoed locations
+  const eligibleLocations = locations.filter((l) => !vetoedLocationIds.has(l.id));
+
+  // Weighted scoring: thumbs up = 1pt, star = 2pts (1 bonus)
+  const weightedScores = new Map<string, number>();
+  for (const loc of eligibleLocations) {
+    const votes = voteCounts.get(loc.id) || 0;
+    const stars = prefCounts.get(loc.id) || 0;
+    weightedScores.set(loc.id, votes + stars);
+  }
+
+  // Default to highest weighted eligible location
+  const topLocationId = [...eligibleLocations].sort(
+    (a, b) => (weightedScores.get(b.id) || 0) - (weightedScores.get(a.id) || 0)
   )[0]?.id || "";
 
   // Default to peak overlap start time
@@ -64,8 +81,8 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
-  const sortedLocations = [...locations].sort(
-    (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
+  const sortedLocations = [...eligibleLocations].sort(
+    (a, b) => (weightedScores.get(b.id) || 0) - (weightedScores.get(a.id) || 0)
   );
 
   const inCount = responses.filter((r) => r.status === "in").length;

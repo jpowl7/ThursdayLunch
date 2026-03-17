@@ -1,12 +1,29 @@
 const API_KEY = process.env.GOOGLE_PLACES_API_KEY;
 
 // 630 E University Dr, Granger, IN
-const LOCATION_BIAS = {
+const DEFAULT_LOCATION_BIAS = {
   circle: {
     center: { latitude: 41.7318, longitude: -86.1145 },
     radius: 20000, // 20km
   },
 };
+
+export interface LocationBias {
+  circle: {
+    center: { latitude: number; longitude: number };
+    radius: number;
+  };
+}
+
+function buildLocationBias(override?: { lat: number; lng: number } | null): LocationBias {
+  if (!override) return DEFAULT_LOCATION_BIAS;
+  return {
+    circle: {
+      center: { latitude: override.lat, longitude: override.lng },
+      radius: 20000,
+    },
+  };
+}
 
 export interface PlaceSuggestion {
   placeId: string;
@@ -15,7 +32,8 @@ export interface PlaceSuggestion {
 }
 
 export async function autocompletePlaces(
-  input: string
+  input: string,
+  locationOverride?: { lat: number; lng: number } | null
 ): Promise<PlaceSuggestion[]> {
   if (!API_KEY || input.length < 2) return [];
 
@@ -30,7 +48,7 @@ export async function autocompletePlaces(
         },
         body: JSON.stringify({
           input,
-          locationBias: LOCATION_BIAS,
+          locationBias: buildLocationBias(locationOverride),
           includedPrimaryTypes: [
             "restaurant",
             "cafe",
@@ -91,6 +109,35 @@ export async function getPlaceDetails(
   }
 }
 
+export async function getPlaceLocation(
+  placeId: string
+): Promise<{ lat: number; lng: number } | null> {
+  if (!API_KEY) return null;
+
+  try {
+    const res = await fetch(
+      `https://places.googleapis.com/v1/places/${placeId}`,
+      {
+        headers: {
+          "X-Goog-Api-Key": API_KEY,
+          "X-Goog-FieldMask": "location",
+        },
+      }
+    );
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    if (!data.location?.latitude || !data.location?.longitude) return null;
+    return {
+      lat: data.location.latitude,
+      lng: data.location.longitude,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export interface NearbyRestaurant {
   id: string;
   name: string;
@@ -101,8 +148,14 @@ export interface NearbyRestaurant {
   typeName: string | null;
 }
 
-export async function searchNearbyRestaurants(): Promise<NearbyRestaurant[]> {
+export async function searchNearbyRestaurants(
+  locationOverride?: { lat: number; lng: number } | null
+): Promise<NearbyRestaurant[]> {
   if (!API_KEY) return [];
+
+  const center = locationOverride
+    ? { latitude: locationOverride.lat, longitude: locationOverride.lng }
+    : { latitude: 41.7318, longitude: -86.1145 };
 
   try {
     const res = await fetch(
@@ -119,7 +172,7 @@ export async function searchNearbyRestaurants(): Promise<NearbyRestaurant[]> {
           includedTypes: ["restaurant", "cafe", "meal_takeaway", "fast_food_restaurant"],
           locationRestriction: {
             circle: {
-              center: { latitude: 41.7318, longitude: -86.1145 },
+              center,
               radius: 4000,
             },
           },
@@ -155,7 +208,8 @@ export async function searchNearbyRestaurants(): Promise<NearbyRestaurant[]> {
 }
 
 export async function lookupPlace(
-  query: string
+  query: string,
+  locationOverride?: { lat: number; lng: number } | null
 ): Promise<{ address: string; mapsUrl: string } | null> {
   if (!API_KEY) return null;
 
@@ -171,7 +225,7 @@ export async function lookupPlace(
         },
         body: JSON.stringify({
           textQuery: query,
-          locationBias: LOCATION_BIAS,
+          locationBias: buildLocationBias(locationOverride),
         }),
       }
     );

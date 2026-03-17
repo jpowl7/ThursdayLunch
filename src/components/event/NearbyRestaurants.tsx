@@ -19,7 +19,7 @@ function faviconUrl(websiteUri: string | null): string | null {
   }
 }
 
-export function NearbyRestaurants() {
+export function NearbyRestaurants({ groupSlug }: { groupSlug?: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -35,7 +35,7 @@ export function NearbyRestaurants() {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch("/api/places/nearby");
+      const res = await fetch(`/api/places/nearby${groupSlug ? `?groupSlug=${encodeURIComponent(groupSlug)}` : ""}`);
       if (!res.ok) throw new Error("fetch failed");
       const data: NearbyRestaurant[] = await res.json();
       cacheRef.current = data;
@@ -45,7 +45,7 @@ export function NearbyRestaurants() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [groupSlug]);
 
   const handleToggle = () => {
     const next = !open;

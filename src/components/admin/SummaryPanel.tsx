@@ -29,13 +29,6 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
     }
   }
 
-  const sortedLocations = [...locations].sort(
-    (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
-  );
-
-  const topLocation = sortedLocations[0];
-  const topVotes = topLocation ? voteCounts.get(topLocation.id) || 0 : 0;
-
   // Time overlap
   const timeSlots: { time: string; count: number }[] = [];
   if (inResponses.length > 0) {
@@ -94,53 +87,11 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
             <span className="material-symbols-outlined text-sm">schedule</span>
           </div>
           <div>
-            <p className="text-slate-500 text-xs">Peak Overlap</p>
+            <p className="text-slate-500 text-xs">When can everyone meet</p>
             <p className="font-bold">{formatTime(peakStart)} — {formatTime(peakEnd)}</p>
           </div>
         </div>
       )}
-
-      {topLocation && topVotes > 0 && (
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-orange-500/10 flex items-center justify-center text-orange-500 shrink-0">
-            <span className="material-symbols-outlined text-sm">restaurant</span>
-          </div>
-          <div className="min-w-0">
-            <p className="text-slate-500 text-xs">Most Voted</p>
-            <p className="font-bold truncate">
-              {topLocation.name}
-              <span className="text-orange-500 font-medium text-sm ml-1">
-                ({topVotes} {topVotes === 1 ? "vote" : "votes"})
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-
-      {(() => {
-        const topStarred = [...locations]
-          .filter((l) => (prefCounts.get(l.id) || 0) > 0)
-          .sort((a, b) => (prefCounts.get(b.id) || 0) - (prefCounts.get(a.id) || 0));
-        const starLead = topStarred[0];
-        const starCount = starLead ? prefCounts.get(starLead.id) || 0 : 0;
-        if (!starLead) return null;
-        return (
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 shrink-0">
-              <span className="material-symbols-outlined text-sm">star</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-slate-500 text-xs">Most Starred</p>
-              <p className="font-bold truncate">
-                {starLead.name}
-                <span className="text-yellow-600 font-medium text-sm ml-1">
-                  ({starCount} {starCount === 1 ? "star" : "stars"})
-                </span>
-              </p>
-            </div>
-          </div>
-        );
-      })()}
 
       {showTimeDistribution && timeSlots.length > 0 && (
         <div>
@@ -163,37 +114,65 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
         </div>
       )}
 
-      {sortedLocations.some((l) => (voteCounts.get(l.id) || 0) > 0) && (
-        <div>
-          <p className="text-slate-500 text-xs mb-2">Location Votes</p>
-          <div className="space-y-2">
-            {sortedLocations.filter((loc) => (voteCounts.get(loc.id) || 0) > 0).map((loc) => {
-              const count = voteCounts.get(loc.id) || 0;
-              const prefs = prefCounts.get(loc.id) || 0;
-              const pct = inResponses.length > 0 ? (count / inResponses.length) * 100 : 0;
-              return (
-                <div key={loc.id} className="flex items-center gap-3 min-w-0">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between text-sm mb-1 gap-2">
-                      <span className="font-medium truncate min-w-0">{loc.name}</span>
-                      <span className="text-slate-400 text-xs flex items-center gap-0.5 shrink-0">
-                        <span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span>
-                        {count}{prefs > 0 && <>&nbsp;· <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>{prefs}</>}
-                      </span>
-                    </div>
-                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-orange-400 rounded-full transition-all"
-                        style={{ width: `${pct}%` }}
-                      />
+      {(() => {
+        // Collect vetoed location IDs from "in" responses
+        const vetoedLocationIds = new Set<string>();
+        for (const r of inResponses) {
+          if (r.vetoLocationId) vetoedLocationIds.add(r.vetoLocationId);
+        }
+
+        // Weighted scoring: thumbs up = 1pt, star = 2pts (1 bonus) — exclude vetoed
+        const weightedScores = new Map<string, number>();
+        for (const loc of locations) {
+          if (vetoedLocationIds.has(loc.id)) continue;
+          const votes = voteCounts.get(loc.id) || 0;
+          const stars = prefCounts.get(loc.id) || 0;
+          weightedScores.set(loc.id, votes + stars);
+        }
+        const weightedSorted = [...locations]
+          .filter((l) => !vetoedLocationIds.has(l.id) && (weightedScores.get(l.id) || 0) > 0)
+          .sort((a, b) => (weightedScores.get(b.id) || 0) - (weightedScores.get(a.id) || 0));
+        const maxScore = Math.max(...[...weightedScores.values()], 1);
+
+        if (weightedSorted.length === 0) return null;
+        return (
+          <div>
+            <div className="flex items-baseline gap-2 mb-2">
+              <p className="text-slate-500 text-xs">Location Votes</p>
+              <p className="text-xs text-orange-400">
+                <span className="material-symbols-outlined filled text-[10px] align-middle">thumb_up</span> = 1pt &middot; <span className="material-symbols-outlined filled text-[10px] align-middle text-yellow-500">star</span> = 2pts &middot; <span className="material-symbols-outlined text-[10px] align-middle text-red-400">block</span> = vetoed
+              </p>
+            </div>
+            <div className="space-y-2">
+              {weightedSorted.map((loc) => {
+                const count = voteCounts.get(loc.id) || 0;
+                const prefs = prefCounts.get(loc.id) || 0;
+                const score = weightedScores.get(loc.id) || 0;
+                const pct = (score / maxScore) * 100;
+                return (
+                  <div key={loc.id} className="flex items-center gap-3 min-w-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between text-sm mb-1 gap-2">
+                        <span className="font-medium truncate min-w-0">{loc.name}</span>
+                        <span className="text-slate-400 text-xs flex items-center gap-0.5 shrink-0">
+                          <span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span>
+                          {count}{prefs > 0 && <>&nbsp;· <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>{prefs}</>}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-orange-400 rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

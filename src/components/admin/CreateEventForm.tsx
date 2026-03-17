@@ -201,6 +201,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
                 onChange={(name, placeId) => updateLocation(i, name, placeId)}
                 placeholder="Search for a restaurant…"
                 inputClassName={inputClass}
+                groupSlug={groupSlug}
               />
             </div>
           ))}

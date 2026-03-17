@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { autocompletePlaces } from "@/lib/google-places";
+import { getGroupLocation } from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   const input = request.nextUrl.searchParams.get("input") ?? "";
@@ -7,6 +8,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json([]);
   }
 
-  const suggestions = await autocompletePlaces(input);
+  const groupSlug = request.nextUrl.searchParams.get("groupSlug");
+  const locationOverride = groupSlug ? await getGroupLocation(groupSlug) : null;
+
+  const suggestions = await autocompletePlaces(input, locationOverride);
   return NextResponse.json(suggestions);
 }

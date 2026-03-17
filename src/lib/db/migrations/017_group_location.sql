@@ -1,0 +1,3 @@
+ALTER TABLE groups ADD COLUMN location_lat DOUBLE PRECISION;
+ALTER TABLE groups ADD COLUMN location_lng DOUBLE PRECISION;
+ALTER TABLE groups ADD COLUMN location_name TEXT;

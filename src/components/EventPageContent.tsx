@@ -85,6 +85,8 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
   const [availableTo, setAvailableTo] = useState<string | null>(null);
   const [locationVotes, setLocationVotes] = useState<string[]>([]);
   const [preferredLocationId, setPreferredLocationId] = useState<string | null>(null);
+  const [vetoLocationId, setVetoLocationId] = useState<string | null>(null);
+  const [vetoReason, setVetoReason] = useState<string | null>(null);
 
   // Initialize name from localStorage once loaded
   useEffect(() => {
@@ -112,6 +114,8 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     setAvailableTo(myResponse.availableTo);
     setLocationVotes(myResponse.locationVotes);
     setPreferredLocationId(myResponse.preferredLocationId);
+    setVetoLocationId(myResponse.vetoLocationId);
+    setVetoReason(myResponse.vetoReason);
   }, [myResponse]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const submitResponse = useCallback(
@@ -122,6 +126,8 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       availableTo: string | null;
       locationVotes: string[];
       preferredLocationId: string | null;
+      vetoLocationId?: string | null;
+      vetoReason?: string | null;
     }, keyOverride?: string) => {
       const key = keyOverride || participantKey;
       if (!snapshot?.event || !key) return;
@@ -154,12 +160,16 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       setAvailableFrom(from);
       setAvailableTo(to);
     }
-    // Clear votes when not "in"
+    // Clear votes and veto when not "in"
     const votes = newStatus === "in" ? locationVotes : [];
     const preferred = newStatus === "in" ? preferredLocationId : null;
+    const veto = newStatus === "in" ? vetoLocationId : null;
+    const reason = newStatus === "in" ? vetoReason : null;
     if (newStatus !== "in") {
       setLocationVotes([]);
       setPreferredLocationId(null);
+      setVetoLocationId(null);
+      setVetoReason(null);
     }
     submitResponse({
       status: newStatus,
@@ -168,6 +178,8 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       availableTo: newStatus === "in" ? to : availableTo,
       locationVotes: votes,
       preferredLocationId: preferred,
+      vetoLocationId: veto,
+      vetoReason: reason,
     }, keyOverride);
   };
 
@@ -175,7 +187,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     if (!status) return;
     setAvailableFrom(from);
     setAvailableTo(to);
-    submitResponse({ status, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId });
+    submitResponse({ status, name, availableFrom: from, availableTo: to, locationVotes, preferredLocationId, vetoLocationId, vetoReason });
   };
 
   const handleVote = (newVotes: string[]) => {
@@ -184,15 +196,38 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     const newPreferred = preferredLocationId && newVotes.includes(preferredLocationId)
       ? preferredLocationId
       : null;
+    // Auto-clear veto if voting for the vetoed location
+    const newVeto = vetoLocationId && newVotes.includes(vetoLocationId) ? null : vetoLocationId;
+    const newVetoReason = newVeto ? vetoReason : null;
     setLocationVotes(newVotes);
     setPreferredLocationId(newPreferred);
-    submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred });
+    if (!newVeto) { setVetoLocationId(null); setVetoReason(null); }
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred, vetoLocationId: newVeto, vetoReason: newVetoReason });
   };
 
   const handlePreference = (locationId: string | null) => {
     if (!status) return;
     setPreferredLocationId(locationId);
-    submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId });
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId: locationId, vetoLocationId, vetoReason });
+  };
+
+  const handleVeto = (locationId: string, reason: string) => {
+    if (!status) return;
+    // Clear vote on the vetoed location if present
+    const newVotes = locationVotes.filter((v) => v !== locationId);
+    const newPreferred = preferredLocationId === locationId ? null : preferredLocationId;
+    setVetoLocationId(locationId);
+    setVetoReason(reason);
+    setLocationVotes(newVotes);
+    setPreferredLocationId(newPreferred);
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes: newVotes, preferredLocationId: newPreferred, vetoLocationId: locationId, vetoReason: reason });
+  };
+
+  const handleClearVeto = () => {
+    if (!status) return;
+    setVetoLocationId(null);
+    setVetoReason(null);
+    submitResponse({ status, name, availableFrom, availableTo, locationVotes, preferredLocationId, vetoLocationId: null, vetoReason: null });
   };
 
   if (loading) {
@@ -220,7 +255,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
           <div className="px-6 pb-8 space-y-5">
             <Leaderboard currentName={savedName ?? null} groupSlug={groupSlug} />
             <PastLunches groupSlug={groupSlug} />
-            <NearbyRestaurants />
+            <NearbyRestaurants groupSlug={groupSlug} />
             <div className="flex justify-center gap-3 pt-2 pb-4">
               <Link href="/" className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Home</Link>
               <span className="text-xs text-slate-200">·</span>
@@ -290,10 +325,15 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
               onVote={status === "in" ? handleVote : () => {}}
               preferredLocationId={status === "in" ? preferredLocationId : null}
               onPreference={status === "in" ? handlePreference : () => {}}
+              vetoLocationId={status === "in" ? vetoLocationId : null}
+              vetoReason={status === "in" ? vetoReason : null}
+              onVeto={status === "in" ? handleVeto : undefined}
+              onClearVeto={status === "in" ? handleClearVeto : undefined}
               eventId={event.id}
               participantKey={status === "in" ? (participantKey ?? undefined) : undefined}
               onLocationAdded={status === "in" ? refresh : () => {}}
               disabled={status !== "in"}
+              groupSlug={groupSlug}
             />
           )}
 
@@ -311,7 +351,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
 
           <Leaderboard currentName={myResponse?.name ?? savedName ?? null} groupSlug={groupSlug} />
           <PastLunches groupSlug={groupSlug} />
-          <NearbyRestaurants />
+          <NearbyRestaurants groupSlug={groupSlug} />
 
           <div className="flex justify-center gap-3 pt-2 pb-4">
             <Link href="/" className="text-xs text-slate-300 hover:text-slate-500 transition-colors">Home</Link>

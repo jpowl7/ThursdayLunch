@@ -13,6 +13,11 @@ interface PastLocation {
   useCount: number;
 }
 
+interface VetoInfo {
+  name: string;
+  reason: string;
+}
+
 interface LocationVotingProps {
   locations: Location[];
   responses: Response[];
@@ -20,10 +25,15 @@ interface LocationVotingProps {
   onVote: (locationIds: string[]) => void;
   preferredLocationId?: string | null;
   onPreference?: (locationId: string | null) => void;
+  vetoLocationId?: string | null;
+  vetoReason?: string | null;
+  onVeto?: (locationId: string, reason: string) => void;
+  onClearVeto?: () => void;
   disabled?: boolean;
   eventId?: string;
   participantKey?: string;
   onLocationAdded?: () => void;
+  groupSlug?: string;
 }
 
 export function LocationVoting({
@@ -33,10 +43,14 @@ export function LocationVoting({
   onVote,
   preferredLocationId,
   onPreference,
+  vetoLocationId,
+  onVeto,
+  onClearVeto,
   disabled,
   eventId,
   participantKey,
   onLocationAdded,
+  groupSlug,
 }: LocationVotingProps) {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
@@ -45,6 +59,8 @@ export function LocationVoting({
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const [pastLocations, setPastLocations] = useState<PastLocation[]>([]);
   const [addingChip, setAddingChip] = useState<string | null>(null);
+  const [vetoingLocationId, setVetoingLocationId] = useState<string | null>(null);
+  const [vetoReasonInput, setVetoReasonInput] = useState("");
 
   const fetchPastLocations = useCallback(async () => {
     if (!eventId) return;
@@ -87,17 +103,31 @@ export function LocationVoting({
     }
   }
 
+  // Build vetoed locations map from all "in" responses
+  const vetoedLocations = new Map<string, VetoInfo[]>();
+  for (const r of responses) {
+    if (r.status === "in" && r.vetoLocationId && r.vetoReason) {
+      const existing = vetoedLocations.get(r.vetoLocationId) || [];
+      existing.push({ name: r.name, reason: r.vetoReason });
+      vetoedLocations.set(r.vetoLocationId, existing);
+    }
+  }
+
   const toggleLocation = (id: string) => {
-    if (disabled) return;
+    if (disabled || vetoedLocations.has(id)) return;
     const next = selectedIds.includes(id)
       ? selectedIds.filter((v) => v !== id)
       : [...selectedIds, id];
     onVote(next);
   };
 
-  const sorted = [...locations].sort(
-    (a, b) => (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0)
-  );
+  const sorted = [...locations].sort((a, b) => {
+    // Vetoed locations go to bottom
+    const aVetoed = vetoedLocations.has(a.id) ? 1 : 0;
+    const bVetoed = vetoedLocations.has(b.id) ? 1 : 0;
+    if (aVetoed !== bVetoed) return aVetoed - bVetoed;
+    return (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0);
+  });
 
   const handlePlaceChange = (name: string, placeId: string | null) => {
     setNewName(name);
@@ -210,119 +240,221 @@ export function LocationVoting({
           Where?
         </h3>
         <span className="text-[11px] text-slate-400 flex items-center gap-2">
-          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span> I like these</span>
-          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span> preference</span>
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-orange-400">thumb_up</span> I&apos;d eat here</span>
+          <span className="flex items-center gap-0.5"><span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span> my preference</span>
         </span>
       </div>
       <div className="space-y-2">
         {(showAll || sorted.length <= 10 ? sorted : sorted.slice(0, 10)).map((loc) => {
-          const isSelected = selectedIds.includes(loc.id);
+          const isEliminated = vetoedLocations.has(loc.id);
+          const vetoes = vetoedLocations.get(loc.id) || [];
+          const isMyVeto = vetoLocationId === loc.id;
+          const isSelected = !isEliminated && selectedIds.includes(loc.id);
           const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
           const prefs = prefCounts.get(loc.id) || 0;
           const canDelete = loc.addedBy === participantKey && recentlyAdded.has(loc.id);
           return (
-            <div
-              key={loc.id}
-              onClick={() => toggleLocation(loc.id)}
-              className={`relative flex items-center gap-3 px-3 py-2.5 bg-white rounded-xl cursor-pointer transition-all ${
-                isSelected
-                  ? "border-2 border-orange-500 shadow-sm shadow-orange-500/10"
-                  : "border border-slate-100 shadow-sm hover:border-orange-500/50"
-              } ${disabled ? "opacity-60 cursor-default" : ""}`}
-            >
-              {/* Check / empty circle */}
-              <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                isSelected ? "bg-orange-500 text-white" : "border-2 border-slate-200"
-              }`}>
-                {isSelected && (
-                  <span className="material-symbols-outlined text-[16px] font-bold">check</span>
+            <div key={loc.id}>
+              <div
+                onClick={() => !isEliminated && toggleLocation(loc.id)}
+                className={`relative flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                  isEliminated
+                    ? "bg-slate-50 border border-slate-100 opacity-60 cursor-default"
+                    : isSelected
+                      ? "bg-white border-2 border-orange-500 shadow-sm shadow-orange-500/10 cursor-pointer"
+                      : `bg-white border border-slate-100 shadow-sm ${disabled ? "opacity-60 cursor-default" : "hover:border-orange-500/50 cursor-pointer"}`
+                }`}
+              >
+                {/* Check / empty circle / veto icon */}
+                {isEliminated ? (
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center bg-red-100 text-red-500" title={vetoes.map((v) => `${v.name}: ${v.reason}`).join("\n")}>
+                    <span className="material-symbols-outlined text-[16px]">block</span>
+                  </div>
+                ) : (
+                  <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                    isSelected ? "bg-orange-500 text-white" : "border-2 border-slate-200"
+                  }`}>
+                    {isSelected && (
+                      <span className="material-symbols-outlined text-[16px] font-bold">check</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Favicon */}
+                {loc.websiteUrl && (() => {
+                  try {
+                    const domain = new URL(loc.websiteUrl).hostname;
+                    return (
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
+                        alt=""
+                        width={24}
+                        height={24}
+                        className={`flex-shrink-0 rounded-sm ${isEliminated ? "grayscale" : ""}`}
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                      />
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
+
+                {/* Name + address */}
+                <div className="flex-1 min-w-0">
+                  <p className={`font-semibold text-sm leading-tight truncate ${isEliminated ? "line-through text-slate-400" : ""}`}>{loc.name}</p>
+                  {isEliminated && (
+                    <p className="text-[11px] text-red-400 leading-tight truncate">
+                      {vetoes.map((v) => `${v.name}: ${v.reason}`).join(" · ")}
+                    </p>
+                  )}
+                  {!isEliminated && loc.address && (
+                    loc.mapsUrl ? (
+                      <a
+                        href={loc.mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-blue-500 hover:underline leading-tight truncate block"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {loc.address}
+                      </a>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 leading-tight truncate">{loc.address}</p>
+                    )
+                  )}
+                </div>
+
+                {/* Vote count + prefs (hidden when eliminated) */}
+                {!isEliminated && (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-300"}`}>
+                      thumb_up
+                    </span>
+                    <span className="text-xs font-bold text-slate-500">{count}</span>
+                    {prefs > 0 && (
+                      <>
+                        <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>
+                        <span className="text-xs font-bold text-yellow-500">{prefs}</span>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Veto count badge for eliminated locations */}
+                {isEliminated && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <span className="material-symbols-outlined text-[14px] text-red-400">block</span>
+                    <span className="text-xs font-bold text-red-400">{vetoes.length}</span>
+                  </div>
+                )}
+
+                {/* Star button for preference */}
+                {isSelected && onPreference && !isEliminated && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onPreference(isPreferred ? null : loc.id);
+                    }}
+                    className="flex-shrink-0 p-0.5 rounded-full transition-all"
+                    title={isPreferred ? "Remove top pick" : "Set as top pick"}
+                  >
+                    <span className={`material-symbols-outlined text-[18px] ${isPreferred ? "filled text-yellow-500" : "text-slate-300 hover:text-yellow-400"}`}>
+                      star
+                    </span>
+                  </button>
+                )}
+
+                {/* Veto button (non-eliminated, status=in) */}
+                {!isEliminated && !disabled && onVeto && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setVetoingLocationId(vetoingLocationId === loc.id ? null : loc.id);
+                      setVetoReasonInput("");
+                    }}
+                    className="flex-shrink-0 p-0.5 rounded-full transition-all"
+                    title="Veto this location"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-400">block</span>
+                  </button>
+                )}
+
+                {/* Clear own veto */}
+                {isMyVeto && onClearVeto && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onClearVeto();
+                    }}
+                    className="flex-shrink-0 px-2 py-0.5 text-[11px] font-medium text-red-500 hover:text-red-700 border border-red-200 rounded-full transition-all"
+                    title="Remove your veto"
+                  >
+                    Undo
+                  </button>
+                )}
+
+                {/* Delete button (only for locations you added) */}
+                {canDelete && !disabled && !isEliminated && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(loc.id, e)}
+                    className="flex-shrink-0 p-0.5 rounded-full transition-all"
+                    title="Remove this location"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-500">
+                      close
+                    </span>
+                  </button>
                 )}
               </div>
 
-              {/* Favicon */}
-              {loc.websiteUrl && (() => {
-                try {
-                  const domain = new URL(loc.websiteUrl).hostname;
-                  return (
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
-                      alt=""
-                      width={24}
-                      height={24}
-                      className="flex-shrink-0 rounded-sm"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                    />
-                  );
-                } catch {
-                  return null;
-                }
-              })()}
-
-              {/* Name + address */}
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm leading-tight truncate">{loc.name}</p>
-                {loc.address && (
-                  loc.mapsUrl ? (
-                    <a
-                      href={loc.mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[11px] text-blue-500 hover:underline leading-tight truncate block"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {loc.address}
-                    </a>
-                  ) : (
-                    <p className="text-[11px] text-slate-400 leading-tight truncate">{loc.address}</p>
-                  )
-                )}
-              </div>
-
-              {/* Vote count + prefs */}
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className={`material-symbols-outlined text-[14px] ${isSelected ? "filled text-orange-500" : "text-slate-300"}`}>
-                  thumb_up
-                </span>
-                <span className="text-xs font-bold text-slate-500">{count}</span>
-                {prefs > 0 && (
-                  <>
-                    <span className="material-symbols-outlined filled text-[12px] text-yellow-500">star</span>
-                    <span className="text-xs font-bold text-yellow-500">{prefs}</span>
-                  </>
-                )}
-              </div>
-
-              {/* Star button for preference */}
-              {isSelected && onPreference && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onPreference(isPreferred ? null : loc.id);
-                  }}
-                  className="flex-shrink-0 p-0.5 rounded-full transition-all"
-                  title={isPreferred ? "Remove top pick" : "Set as top pick"}
-                >
-                  <span className={`material-symbols-outlined text-[18px] ${isPreferred ? "filled text-yellow-500" : "text-slate-300 hover:text-yellow-400"}`}>
-                    star
-                  </span>
-                </button>
-              )}
-
-
-              {/* Delete button (only for locations you added) */}
-              {canDelete && !disabled && (
-                <button
-                  type="button"
-                  onClick={(e) => handleDelete(loc.id, e)}
-                  className="flex-shrink-0 p-0.5 rounded-full transition-all"
-                  title="Remove this location"
-                >
-                  <span className="material-symbols-outlined text-[16px] text-slate-300 hover:text-red-500">
-                    close
-                  </span>
-                </button>
+              {/* Inline veto reason input */}
+              {vetoingLocationId === loc.id && (
+                <div className="flex gap-2 mt-1 ml-9">
+                  <input
+                    type="text"
+                    value={vetoReasonInput}
+                    onChange={(e) => setVetoReasonInput(e.target.value)}
+                    placeholder="Reason (e.g. ate here yesterday)"
+                    className="flex-1 px-3 py-1.5 text-sm border border-red-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-red-400 focus:border-red-400"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && vetoReasonInput.trim()) {
+                        onVeto?.(loc.id, vetoReasonInput.trim());
+                        setVetoingLocationId(null);
+                        setVetoReasonInput("");
+                      } else if (e.key === "Escape") {
+                        setVetoingLocationId(null);
+                        setVetoReasonInput("");
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (vetoReasonInput.trim()) {
+                        onVeto?.(loc.id, vetoReasonInput.trim());
+                        setVetoingLocationId(null);
+                        setVetoReasonInput("");
+                      }
+                    }}
+                    disabled={!vetoReasonInput.trim()}
+                    className="px-3 py-1.5 text-sm font-semibold rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+                  >
+                    Veto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setVetoingLocationId(null); setVetoReasonInput(""); }}
+                    className="px-2 py-1.5 text-sm text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
               )}
             </div>
           );
@@ -377,6 +509,7 @@ export function LocationVoting({
                 value={newName}
                 onChange={handlePlaceChange}
                 placeholder="Suggest a place…"
+                groupSlug={groupSlug}
                 inputClassName={`w-full px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
                   isDuplicate
                     ? "border-red-300 focus:border-red-400 focus:ring-red-400"

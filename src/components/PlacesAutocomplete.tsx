@@ -14,6 +14,7 @@ interface PlacesAutocompleteProps {
   placeholder?: string;
   disabled?: boolean;
   inputClassName?: string;
+  groupSlug?: string;
 }
 
 export function PlacesAutocomplete({
@@ -22,6 +23,7 @@ export function PlacesAutocomplete({
   placeholder = "Search for a place…",
   disabled,
   inputClassName,
+  groupSlug,
 }: PlacesAutocompleteProps) {
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -41,9 +43,8 @@ export function PlacesAutocomplete({
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `/api/places/autocomplete?input=${encodeURIComponent(value.trim())}`
-        );
+        const url = `/api/places/autocomplete?input=${encodeURIComponent(value.trim())}${groupSlug ? `&groupSlug=${encodeURIComponent(groupSlug)}` : ""}`;
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
           setSuggestions(data);
@@ -57,7 +58,7 @@ export function PlacesAutocomplete({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [value, hasSelection]);
+  }, [value, hasSelection, groupSlug]);
 
   // Close suggestions on outside click
   useEffect(() => {

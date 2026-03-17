@@ -33,6 +33,29 @@ export async function updateGroupPasscode(groupId: string, newPasscode: string) 
   return rows[0] ? mapGroup(rows[0]) : null;
 }
 
+export async function updateGroupLocation(slug: string, lat: number, lng: number, name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE groups SET location_lat = ${lat}, location_lng = ${lng}, location_name = ${name}
+    WHERE slug = ${slug}
+    RETURNING *
+  `;
+  return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+export async function getGroupLocation(slug: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT location_lat, location_lng, location_name FROM groups WHERE slug = ${slug}
+  `;
+  if (!rows[0] || rows[0].location_lat == null) return null;
+  return {
+    lat: Number(rows[0].location_lat),
+    lng: Number(rows[0].location_lng),
+    name: (rows[0].location_name as string) || null,
+  };
+}
+
 export async function getGroupByEventId(eventId: string) {
   const sql = getDb();
   const rows = await sql`
@@ -119,7 +142,7 @@ export async function updateParticipantPin(participantKey: string, currentPin: s
 
 export async function getCurrentEvent(groupId: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} AND (go_live_at IS NULL OR go_live_at <= NOW()) AND created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} AND (go_live_at IS NULL OR go_live_at <= NOW()) AND (created_at > NOW() - INTERVAL '24 hours' OR date >= CURRENT_DATE) ORDER BY created_at DESC LIMIT 1`;
   return rows[0] || null;
 }
 
@@ -243,19 +266,23 @@ export async function getResponseByKey(eventId: string, participantKey: string) 
 export async function upsertResponse(
   eventId: string,
   participantKey: string,
-  input: { name: string; status: "in" | "out" | "maybe"; availableFrom: string | null; availableTo: string | null; locationVotes: string[]; preferredLocationId: string | null }
+  input: { name: string; status: "in" | "out" | "maybe"; availableFrom: string | null; availableTo: string | null; locationVotes: string[]; preferredLocationId: string | null; vetoLocationId?: string | null; vetoReason?: string | null }
 ) {
   const sql = getDb();
+  const vetoLocationId = input.vetoLocationId ?? null;
+  const vetoReason = input.vetoReason ?? null;
 
   const rows = await sql`
-    INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id)
-    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
+    INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
+    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
     ON CONFLICT (event_id, participant_key) DO UPDATE SET
       name = ${input.name},
       status = ${input.status},
       available_from = ${input.availableFrom},
       available_to = ${input.availableTo},
       preferred_location_id = ${input.preferredLocationId},
+      veto_location_id = ${vetoLocationId},
+      veto_reason = ${vetoReason},
       updated_at = now()
     RETURNING *
   `;
@@ -264,8 +291,8 @@ export async function upsertResponse(
 
   // Record history snapshot
   await sql`
-    INSERT INTO response_history (response_id, event_id, participant_key, name, status, available_from, available_to, preferred_location_id)
-    VALUES (${response.id}, ${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId})
+    INSERT INTO response_history (response_id, event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
+    VALUES (${response.id}, ${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
   `;
 
   // Update location votes
@@ -338,11 +365,11 @@ export async function deleteResponse(responseId: string) {
 export async function toggleResponseStatus(responseId: string, status: "in" | "out" | "maybe") {
   const sql = getDb();
   if (status !== "in") {
-    // Clear votes and preference when toggling to out or maybe
+    // Clear votes, preference, and veto when toggling to out or maybe
     await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
     const rows = await sql`
       UPDATE responses
-      SET status = ${status}, preferred_location_id = NULL, available_from = NULL, available_to = NULL, updated_at = now()
+      SET status = ${status}, preferred_location_id = NULL, veto_location_id = NULL, veto_reason = NULL, available_from = NULL, available_to = NULL, updated_at = now()
       WHERE id = ${responseId}
       RETURNING *
     `;
@@ -823,6 +850,8 @@ function mapResponse(row: Record<string, unknown>) {
     availableTo: row.available_to ? normalizeTime(row.available_to) : null,
     locationVotes: votes,
     preferredLocationId: row.preferred_location_id ? String(row.preferred_location_id) : null,
+    vetoLocationId: row.veto_location_id ? String(row.veto_location_id) : null,
+    vetoReason: row.veto_reason ? String(row.veto_reason) : null,
     noShow: row.no_show === true,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
@@ -835,6 +864,9 @@ function mapGroup(row: Record<string, unknown>) {
     slug: row.slug as string,
     name: row.name as string,
     passcode: row.passcode as string,
+    locationLat: row.location_lat != null ? Number(row.location_lat) : null,
+    locationLng: row.location_lng != null ? Number(row.location_lng) : null,
+    locationName: (row.location_name as string) || null,
     createdAt: String(row.created_at),
   };
 }
