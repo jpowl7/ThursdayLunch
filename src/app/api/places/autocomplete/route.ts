@@ -9,8 +9,9 @@ export async function GET(request: NextRequest) {
   }
 
   const groupSlug = request.nextUrl.searchParams.get("groupSlug");
+  const types = request.nextUrl.searchParams.get("types");
   const locationOverride = groupSlug ? await getGroupLocation(groupSlug) : null;
 
-  const suggestions = await autocompletePlaces(input, locationOverride);
+  const suggestions = await autocompletePlaces(input, locationOverride, types);
   return NextResponse.json(suggestions);
 }

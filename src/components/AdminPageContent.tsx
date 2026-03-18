@@ -434,7 +434,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
                   setSelectedLocationPlaceId(placeId);
                 }}
                 placeholder="Search for a city or area…"
-                groupSlug={groupSlug}
+                types="locality,sublocality,neighborhood,postal_code,administrative_area_level_3"
               />
               <div className="flex gap-2">
                 <button

@@ -33,9 +33,13 @@ export interface PlaceSuggestion {
 
 export async function autocompletePlaces(
   input: string,
-  locationOverride?: { lat: number; lng: number } | null
+  locationOverride?: { lat: number; lng: number } | null,
+  types?: string | null
 ): Promise<PlaceSuggestion[]> {
   if (!API_KEY || input.length < 2) return [];
+
+  const defaultTypes = ["restaurant", "cafe", "meal_takeaway", "bar", "food"];
+  const includedPrimaryTypes = types ? types.split(",") : defaultTypes;
 
   try {
     const res = await fetch(
@@ -49,13 +53,7 @@ export async function autocompletePlaces(
         body: JSON.stringify({
           input,
           locationBias: buildLocationBias(locationOverride),
-          includedPrimaryTypes: [
-            "restaurant",
-            "cafe",
-            "meal_takeaway",
-            "bar",
-            "food",
-          ],
+          includedPrimaryTypes,
         }),
       }
     );
