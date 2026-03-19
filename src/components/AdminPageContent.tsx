@@ -212,11 +212,11 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
 
   if (!authorized) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4">
+      <div className="flex items-center justify-center min-h-screen w-full overflow-hidden px-4">
+        <div className="text-center space-y-4 w-full max-w-[280px]">
           <span className="material-symbols-outlined text-slate-300 text-[48px]">lock</span>
           <p className="text-slate-400">Enter group passcode</p>
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-center">
             <input
               type="text"
               inputMode="numeric"
@@ -225,7 +225,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               onChange={(e) => setPasscodeInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
               onKeyDown={(e) => e.key === "Enter" && handlePasscodeSubmit()}
               placeholder="0000"
-              className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 text-center tracking-widest"
+              className="w-24 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 text-center tracking-widest"
               autoFocus
             />
             <button
@@ -244,7 +244,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-screen w-full overflow-hidden">
         <div className="text-center">
           <span className="material-symbols-outlined text-orange-300 text-[48px] animate-pulse">lunch_dining</span>
           <p className="text-slate-400 mt-2 font-medium">Loading...</p>
