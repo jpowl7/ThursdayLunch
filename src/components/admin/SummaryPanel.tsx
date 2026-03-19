@@ -144,7 +144,7 @@ export function SummaryPanel({ snapshot, showTimeDistribution = true }: SummaryP
               </p>
             </div>
             <div className="space-y-2">
-              {weightedSorted.map((loc) => {
+              {weightedSorted.slice(0, 4).map((loc) => {
                 const count = voteCounts.get(loc.id) || 0;
                 const prefs = prefCounts.get(loc.id) || 0;
                 const score = weightedScores.get(loc.id) || 0;
