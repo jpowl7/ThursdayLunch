@@ -4,18 +4,19 @@ import { toast } from "sonner";
 import type { Event } from "@/lib/schemas";
 
 interface ShareButtonProps {
-  event: Event;
+  event?: Event;
   groupSlug: string;
 }
 
 export function ShareButton({ event, groupSlug }: ShareButtonProps) {
   const handleShare = async () => {
     const url = `${window.location.origin}/g/${groupSlug}`;
-    const text = `Join us for lunch! ${event.title}`;
+    const title = event?.title || "Join us for lunch!";
+    const text = event ? `Join us for lunch! ${event.title}` : "Join our lunch group!";
 
     if (navigator.share) {
       try {
-        await navigator.share({ title: event.title, text, url });
+        await navigator.share({ title, text, url });
       } catch (err) {
         // User cancelled share — ignore AbortError
         if (err instanceof Error && err.name === "AbortError") return;

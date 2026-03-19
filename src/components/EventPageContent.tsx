@@ -251,6 +251,18 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
     return (
       <div className="flex justify-center min-h-screen">
         <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5]">
+          <header className="pt-6 px-6 pb-4 bg-white sticky top-0 z-20 border-b border-orange-500/10">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-orange-500">lunch_dining</span>
+                <h1 className="text-lg font-bold tracking-tight">No Event</h1>
+              </div>
+              <div className="flex items-center gap-0.5">
+                <NotificationBell participantKey={participantKey} groupSlug={groupSlug} />
+                <ShareButton groupSlug={groupSlug} />
+              </div>
+            </div>
+          </header>
           <div className="flex items-center justify-center py-24">
             <div className="text-center">
               <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
