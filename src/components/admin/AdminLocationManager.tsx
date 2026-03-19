@@ -82,7 +82,7 @@ export function AdminLocationManager({ locations, eventId, token, onChanged }: A
                   if (e.key === "Enter") saveEdit(loc.id);
                   if (e.key === "Escape") cancelEdit();
                 }}
-                className="flex-1 px-2 py-1 text-sm border border-orange-400 rounded focus:outline-none focus:ring-1 focus:ring-orange-400"
+                className="flex-1 px-2 py-1 text-base border border-orange-400 rounded focus:outline-none focus:ring-1 focus:ring-orange-400"
                 autoFocus
               />
             ) : (

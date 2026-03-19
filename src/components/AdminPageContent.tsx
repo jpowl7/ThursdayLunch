@@ -225,7 +225,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               onChange={(e) => setPasscodeInput(e.target.value.replace(/\D/g, "").slice(0, 4))}
               onKeyDown={(e) => e.key === "Enter" && handlePasscodeSubmit()}
               placeholder="0000"
-              className="w-24 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 text-center tracking-widest"
+              className="w-24 px-3 py-2 text-base border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400 text-center tracking-widest"
               autoFocus
             />
             <button
@@ -515,7 +515,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               value={newPasscode}
               onChange={(e) => setNewPasscode(e.target.value.replace(/\D/g, "").slice(0, 4))}
               placeholder="New 4-digit passcode"
-              className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+              className="flex-1 px-3 py-2 text-base border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
             />
             <button
               type="button"

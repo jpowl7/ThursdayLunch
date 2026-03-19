@@ -409,7 +409,7 @@ export function LocationVoting({
                     value={vetoReasonInput}
                     onChange={(e) => setVetoReasonInput(e.target.value)}
                     placeholder="Reason (e.g. ate here yesterday)"
-                    className="flex-1 px-3 py-1.5 text-sm border border-red-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-red-400 focus:border-red-400"
+                    className="flex-1 px-3 py-1.5 text-base border border-red-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-red-400 focus:border-red-400"
                     autoFocus
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && vetoReasonInput.trim()) {
@@ -499,7 +499,7 @@ export function LocationVoting({
                 onChange={handlePlaceChange}
                 placeholder="Suggest a place…"
                 groupSlug={groupSlug}
-                inputClassName={`w-full px-3 py-2 text-sm border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
+                inputClassName={`w-full px-3 py-2 text-base border rounded-lg bg-white focus:outline-none focus:ring-1 transition-colors ${
                   isDuplicate
                     ? "border-red-300 focus:border-red-400 focus:ring-red-400"
                     : "border-slate-200 focus:border-orange-400 focus:ring-orange-400"

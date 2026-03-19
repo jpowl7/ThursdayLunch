@@ -93,7 +93,7 @@ export function PlacesAutocomplete({
   };
 
   const defaultInputClass =
-    "w-full bg-white border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm";
+    "w-full bg-white border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-base";
 
   return (
     <div className="relative">

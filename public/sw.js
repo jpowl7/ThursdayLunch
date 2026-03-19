@@ -1,4 +1,4 @@
-const CACHE_NAME = "thursday-lunch-v6";
+const CACHE_NAME = "thursday-lunch-v7";
 const SHELL_URLS = ["/", "/manifest.json", "/offline.html"];
 
 self.addEventListener("install", (event) => {
