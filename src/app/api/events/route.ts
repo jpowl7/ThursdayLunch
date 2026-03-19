@@ -26,15 +26,18 @@ export async function POST(request: NextRequest) {
 
       // Use delayStartTime as base if provided, otherwise now
       // Parse in US Eastern time (Granger, IN) since the time picker is local to the user
+      // Use TODAY's date (when admin is creating), not the event date (which may be tomorrow)
       let baseMs = Date.now();
-      if (delayStartTime && eventInput.date) {
-        const utcGuess = new Date(`${eventInput.date}T${delayStartTime}:00Z`);
+      if (delayStartTime) {
+        const todayET = new Date().toLocaleDateString("en-CA", { timeZone: "America/Indiana/Indianapolis" }); // YYYY-MM-DD
+        const utcGuess = new Date(`${todayET}T${delayStartTime}:00Z`);
         const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
         const offsetMs = inEastern.getTime() - utcGuess.getTime();
         const startDate = new Date(utcGuess.getTime() - offsetMs);
-        if (!isNaN(startDate.getTime())) {
+        if (!isNaN(startDate.getTime()) && startDate.getTime() > Date.now()) {
           baseMs = startDate.getTime();
         }
+        // If computed time is in the past, fall back to Date.now()
       }
       goLiveAt = new Date(baseMs + delayMs).toISOString();
       delayStartAt = new Date(baseMs).toISOString();
