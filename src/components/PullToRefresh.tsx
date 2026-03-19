@@ -88,6 +88,8 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
         style={{
           transform: pullDistance > 0 ? `translateY(${pullDistance}px)` : undefined,
           transition: pulling.current ? "none" : "transform 0.2s ease-out",
+          maxWidth: "100vw",
+          overflowX: "hidden" as const,
         }}
       >
         {children}
