@@ -126,7 +126,10 @@ export function LocationVoting({
     const aVetoed = vetoedLocations.has(a.id) ? 1 : 0;
     const bVetoed = vetoedLocations.has(b.id) ? 1 : 0;
     if (aVetoed !== bVetoed) return aVetoed - bVetoed;
-    return (voteCounts.get(b.id) || 0) - (voteCounts.get(a.id) || 0);
+    // Weighted: votes + star bonus
+    const aScore = (voteCounts.get(a.id) || 0) + (prefCounts.get(a.id) || 0);
+    const bScore = (voteCounts.get(b.id) || 0) + (prefCounts.get(b.id) || 0);
+    return bScore - aScore;
   });
 
   const handlePlaceChange = (name: string, placeId: string | null) => {
