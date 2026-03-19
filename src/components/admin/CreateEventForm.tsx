@@ -87,7 +87,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const inputClass = "w-full bg-white border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm";
 
   return (
-    <div className="bg-white rounded-xl p-6 border border-orange-500/10 shadow-sm">
+    <div className="bg-white rounded-xl p-4 sm:p-6 border border-orange-500/10 shadow-sm overflow-hidden">
       <h2 className="text-xl font-bold mb-1">Create New Event</h2>
       <p className="text-slate-400 text-sm mb-6">Set up a new event for the group</p>
 
@@ -114,8 +114,8 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5 min-w-0">
             <Label className="text-sm font-medium px-1">Earliest Time</Label>
             <input
               type="time"
@@ -124,7 +124,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
               className={inputClass}
             />
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-0">
             <Label className="text-sm font-medium px-1">Latest Time</Label>
             <input
               type="time"

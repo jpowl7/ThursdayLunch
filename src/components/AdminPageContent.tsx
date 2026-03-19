@@ -256,8 +256,8 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const headerTitle = groupName ? `${groupName} Admin` : "Admin";
 
   return (
-    <div className="flex justify-center min-h-screen">
-      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5] overflow-x-hidden">
+    <div className="flex justify-center min-h-screen overflow-hidden w-full">
+      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5] overflow-x-hidden min-w-0">
         <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <span className="material-symbols-outlined text-orange-500 shrink-0">lunch_dining</span>
