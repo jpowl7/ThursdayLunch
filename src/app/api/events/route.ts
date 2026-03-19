@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const { locations, groupSlug, delayWindow, delayStartTime, ...eventInput } = parsed.data;
+    const { locations, groupSlug, delayWindow, delayStartTime, delayStartDate, ...eventInput } = parsed.data;
 
     // Compute random go-live time if delay requested
     let goLiveAt: string | null = null;
@@ -24,13 +24,12 @@ export async function POST(request: NextRequest) {
       const windowMs = parseInt(delayWindow) * 60 * 1000;
       const delayMs = Math.floor(Math.random() * windowMs);
 
-      // Use delayStartTime as base if provided, otherwise now
+      // Use delayStartDate + delayStartTime as base if provided, otherwise now
       // Parse in US Eastern time (Granger, IN) since the time picker is local to the user
-      // Use TODAY's date (when admin is creating), not the event date (which may be tomorrow)
       let baseMs = Date.now();
       if (delayStartTime) {
-        const todayET = new Date().toLocaleDateString("en-CA", { timeZone: "America/Indiana/Indianapolis" }); // YYYY-MM-DD
-        const utcGuess = new Date(`${todayET}T${delayStartTime}:00Z`);
+        const dateStr = delayStartDate || new Date().toLocaleDateString("en-CA", { timeZone: "America/Indiana/Indianapolis" });
+        const utcGuess = new Date(`${dateStr}T${delayStartTime}:00Z`);
         const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
         const offsetMs = inEastern.getTime() - utcGuess.getTime();
         const startDate = new Date(utcGuess.getTime() - offsetMs);

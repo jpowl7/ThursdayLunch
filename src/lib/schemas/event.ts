@@ -42,6 +42,7 @@ export const CreateEventSchema = z.object({
   groupSlug: z.string().min(1),
   delayWindow: z.enum(["none", "15", "30", "60", "120"]).optional().default("none"),
   delayStartTime: z.string().optional(),
+  delayStartDate: z.string().optional(),
 });
 
 export const AddLocationSchema = z.object({

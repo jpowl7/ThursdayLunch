@@ -24,6 +24,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const [delayEnabled, setDelayEnabled] = useState(false);
   const [delayWindow, setDelayWindow] = useState("30");
   const [delayStartTime, setDelayStartTime] = useState("");
+  const [delayStartDate, setDelayStartDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -63,6 +64,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           groupSlug,
           delayWindow: delayEnabled ? delayWindow : "none",
           delayStartTime: delayEnabled && delayStartTime ? delayStartTime : undefined,
+          delayStartDate: delayEnabled && delayStartDate ? delayStartDate : undefined,
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             placeId: l.placeId || undefined,
@@ -152,15 +154,26 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
             <div className="ml-7 space-y-3">
               <div className="space-y-1">
                 <Label className="text-xs font-medium text-slate-500">Start delay at</Label>
-                <input
-                  type="time"
-                  value={delayStartTime}
-                  onChange={(e) => setDelayStartTime(e.target.value)}
-                  placeholder="Now"
-                  className={inputClass}
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="min-w-0">
+                    <input
+                      type="date"
+                      value={delayStartDate}
+                      onChange={(e) => setDelayStartDate(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                  <div className="min-w-0">
+                    <input
+                      type="time"
+                      value={delayStartTime}
+                      onChange={(e) => setDelayStartTime(e.target.value)}
+                      className={inputClass}
+                    />
+                  </div>
+                </div>
                 <p className="text-xs text-slate-400">
-                  {delayStartTime ? "Delay timer begins at this time" : "Leave blank to start immediately"}
+                  {delayStartTime || delayStartDate ? "Delay timer begins at this date/time" : "Leave blank to start immediately"}
                 </p>
               </div>
               <div className="space-y-1">
