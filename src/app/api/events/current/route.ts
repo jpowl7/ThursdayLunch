@@ -30,10 +30,10 @@ export async function GET(request: NextRequest) {
       // Check for heads-up notifications (5 min before delay window)
       const headsUp = await claimHeadsUpNotifications(group.id);
       if (headsUp) {
-        const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+        const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" });
         const windowStart = headsUp.delay_start_at ? fmt(new Date(String(headsUp.delay_start_at))) : "";
         const windowEnd = headsUp.delay_end_at ? fmt(new Date(String(headsUp.delay_end_at))) : "";
-        const eventDate = new Date(String(headsUp.date) + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        const eventDate = new Date(String(headsUp.date)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Indiana/Indianapolis" });
 
         await sendPushToGroup(group.id, {
           title: String(headsUp.title),
