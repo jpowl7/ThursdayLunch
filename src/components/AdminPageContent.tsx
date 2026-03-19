@@ -256,9 +256,9 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const headerTitle = groupName ? `${groupName} Admin` : "Admin";
 
   return (
-    <div className="flex justify-center min-h-screen overflow-hidden w-full">
-      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5] overflow-x-hidden min-w-0">
-        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-4 py-4 flex items-center justify-between">
+    <div className="flex justify-center min-h-screen max-w-[100vw] overflow-hidden">
+      <main className="w-full max-w-[430px] min-h-screen shadow-2xl bg-[#f8f7f5] overflow-hidden min-w-0">
+        <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-orange-500/10 px-4 py-4 flex items-center justify-between min-w-0">
           <div className="flex items-center gap-3 min-w-0">
             <span className="material-symbols-outlined text-orange-500 shrink-0">lunch_dining</span>
             <h1 className="text-lg font-bold tracking-tight truncate">{headerTitle}</h1>
@@ -269,7 +269,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           </div>
         </header>
 
-        <div className="px-4 pb-12 pt-4 space-y-6">
+        <div className="px-4 pb-12 pt-4 space-y-6 overflow-hidden">
         {isOpenGroup && (
           <div className="bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 flex items-center gap-2">
             <span className="material-symbols-outlined text-purple-500 text-[20px]">science</span>

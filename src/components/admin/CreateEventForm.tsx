@@ -84,7 +84,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
     }
   };
 
-  const inputClass = "w-full bg-white border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm";
+  const inputClass = "w-full max-w-full bg-white border border-slate-200 rounded-lg px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm box-border";
 
   return (
     <div className="bg-white rounded-xl p-4 sm:p-6 border border-orange-500/10 shadow-sm overflow-hidden">
