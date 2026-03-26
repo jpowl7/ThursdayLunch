@@ -181,6 +181,28 @@ export async function claimHeadsUpNotifications(groupId: string) {
   return rows[0] || null;
 }
 
+export async function claimAutoFinalize(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events SET auto_finalize_claimed = TRUE
+    WHERE group_id = ${groupId} AND status = 'open'
+      AND voting_deadline IS NOT NULL AND voting_deadline <= NOW()
+      AND auto_finalize_claimed = FALSE
+    RETURNING *
+  `;
+  return rows[0] || null;
+}
+
+export async function updateVotingDeadline(eventId: string, votingDeadline: string | null) {
+  const sql = getDb();
+  const rows = await sql`
+    UPDATE events SET voting_deadline = ${votingDeadline}, auto_finalize_claimed = FALSE
+    WHERE id = ${eventId}
+    RETURNING *
+  `;
+  return rows[0] ? mapEvent(rows[0]) : null;
+}
+
 export async function getEventById(id: string) {
   const sql = getDb();
   const rows = await sql`SELECT * FROM events WHERE id = ${id}`;
@@ -213,6 +235,7 @@ export async function createEvent(
   input: {
     title: string; date: string; earliestTime: string; latestTime: string;
     goLiveAt?: string | null; delayStartAt?: string | null; delayEndAt?: string | null; headsUpAt?: string | null;
+    votingDeadline?: string | null;
   },
   locations: { name: string; address?: string; mapsUrl?: string; websiteUrl?: string }[],
   groupId: string
@@ -225,8 +248,8 @@ export async function createEvent(
   const notificationsSent = !input.goLiveAt;
   const headsUpSent = !input.headsUpAt;
   const eventRows = await sql`
-    INSERT INTO events (title, date, earliest_time, latest_time, group_id, go_live_at, notifications_sent, heads_up_at, heads_up_sent, delay_start_at, delay_end_at)
-    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId}, ${input.goLiveAt || null}, ${notificationsSent}, ${input.headsUpAt || null}, ${headsUpSent}, ${input.delayStartAt || null}, ${input.delayEndAt || null})
+    INSERT INTO events (title, date, earliest_time, latest_time, group_id, go_live_at, notifications_sent, heads_up_at, heads_up_sent, delay_start_at, delay_end_at, voting_deadline)
+    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId}, ${input.goLiveAt || null}, ${notificationsSent}, ${input.headsUpAt || null}, ${headsUpSent}, ${input.delayStartAt || null}, ${input.delayEndAt || null}, ${input.votingDeadline || null})
     RETURNING *
   `;
 
@@ -513,7 +536,7 @@ export async function getLeaderboardTastemaker(groupId: string) {
       AND r.preferred_location_id IS NOT NULL
       AND r.preferred_location_id = e.chosen_location_id
     GROUP BY LOWER(r.name)
-    ORDER BY count DESC, name
+    ORDER BY count DESC, MIN(r.updated_at) ASC, name
     LIMIT 10
   `;
 }
@@ -669,6 +692,27 @@ export async function getLeaderboardTrendsetter(groupId: string) {
   `;
 }
 
+export async function getLeaderboardFlipFlopper(groupId: string) {
+  const sql = getDb();
+  return sql`
+    WITH changes_per_event AS (
+      SELECT rh.name,
+             rh.event_id,
+             COUNT(*)::int - 1 AS flips
+      FROM response_history rh
+      JOIN events e ON e.id = rh.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      GROUP BY rh.event_id, rh.participant_key, rh.name
+      HAVING COUNT(*) > 1
+    )
+    SELECT MAX(name) AS name,
+           SUM(flips)::int AS count
+    FROM changes_per_event
+    GROUP BY LOWER(name)
+    ORDER BY count DESC, name
+    LIMIT 10
+  `;
+}
+
 // ── Response history queries ──────────────────────────────────
 
 export async function getResponseHistory(eventId: string, name: string) {
@@ -810,6 +854,7 @@ function mapEvent(row: Record<string, unknown>) {
     goLiveAt: row.go_live_at ? String(row.go_live_at) : null,
     delayStartAt: row.delay_start_at ? String(row.delay_start_at) : null,
     delayEndAt: row.delay_end_at ? String(row.delay_end_at) : null,
+    votingDeadline: row.voting_deadline ? String(row.voting_deadline) : null,
   };
 }
 

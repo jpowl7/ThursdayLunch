@@ -25,6 +25,8 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
   const [delayWindow, setDelayWindow] = useState("30");
   const [delayStartTime, setDelayStartTime] = useState("");
   const [delayStartDate, setDelayStartDate] = useState("");
+  const [deadlineEnabled, setDeadlineEnabled] = useState(false);
+  const [deadlineTime, setDeadlineTime] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -65,6 +67,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           delayWindow: delayEnabled ? delayWindow : "none",
           delayStartTime: delayEnabled && delayStartTime ? delayStartTime : undefined,
           delayStartDate: delayEnabled && delayStartDate ? delayStartDate : undefined,
+          votingDeadlineTime: deadlineEnabled && deadlineTime ? deadlineTime : undefined,
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             placeId: l.placeId || undefined,
@@ -189,6 +192,35 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
                   <option value="120">Up to 2 hours</option>
                 </select>
               </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-3 px-1">
+            <input
+              type="checkbox"
+              id="deadline-toggle"
+              checked={deadlineEnabled}
+              onChange={(e) => setDeadlineEnabled(e.target.checked)}
+              className="w-4 h-4 accent-orange-500"
+            />
+            <Label htmlFor="deadline-toggle" className="text-sm font-medium cursor-pointer">
+              Auto-finalize at a set time
+            </Label>
+          </div>
+          {deadlineEnabled && (
+            <div className="ml-7 space-y-1">
+              <Label className="text-xs font-medium text-slate-500">Close voting at</Label>
+              <input
+                type="time"
+                value={deadlineTime}
+                onChange={(e) => setDeadlineTime(e.target.value)}
+                className={inputClass}
+              />
+              <p className="text-xs text-slate-400">
+                Voting will automatically close and the top-voted venue will be selected at this time on the event date
+              </p>
             </div>
           )}
         </div>

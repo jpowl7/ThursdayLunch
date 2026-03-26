@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAllGroupIds, claimGoLiveNotifications, claimHeadsUpNotifications } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
+import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 
 export async function GET() {
   // Public endpoint — safe because claim queries are atomic and idempotent
@@ -40,5 +41,8 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ ok: true, goLiveCount, headsUpCount });
+  // Check for events past their voting deadline
+  const autoFinalizeCount = await processAutoFinalizeAll();
+
+  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount });
 }

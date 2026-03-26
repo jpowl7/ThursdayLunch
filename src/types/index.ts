@@ -27,6 +27,7 @@ export interface LeaderboardData {
   fashionablyLate: LeaderboardEntry[];
   trendsetter: LeaderboardEntry[];
   coneOfShame: LeaderboardEntry[];
+  flipFlopper: LeaderboardEntry[];
 }
 
 export interface Group {

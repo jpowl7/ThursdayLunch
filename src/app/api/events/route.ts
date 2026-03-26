@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const { locations, groupSlug, delayWindow, delayStartTime, delayStartDate, ...eventInput } = parsed.data;
+    const { locations, groupSlug, delayWindow, delayStartTime, delayStartDate, votingDeadlineTime, ...eventInput } = parsed.data;
 
     // Compute random go-live time if delay requested
     let goLiveAt: string | null = null;
@@ -76,7 +76,17 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, headsUpAt }, resolvedLocations, group.id);
+    // Compute voting deadline if provided
+    let votingDeadline: string | null = null;
+    if (votingDeadlineTime) {
+      // Convert event date + deadline time to UTC using Eastern time offset
+      const utcGuess = new Date(`${eventInput.date}T${votingDeadlineTime}:00Z`);
+      const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
+      const offsetMs = inEastern.getTime() - utcGuess.getTime();
+      votingDeadline = new Date(utcGuess.getTime() - offsetMs).toISOString();
+    }
+
+    const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, headsUpAt, votingDeadline }, resolvedLocations, group.id);
 
     // Send push immediately only for non-delayed events
     // Delayed events get a heads-up notification via polling (5 min before window)

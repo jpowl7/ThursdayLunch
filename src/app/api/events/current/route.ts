@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { getCurrentEvent, getEventSnapshot, getGroupBySlug, claimGoLiveNotifications, claimHeadsUpNotifications } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
+import { processAutoFinalizeForGroup } from "@/lib/auto-finalize";
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,6 +43,9 @@ export async function GET(request: NextRequest) {
           tag: `event-headsup-${headsUp.id}`,
         });
       }
+
+      // Check for events past their voting deadline
+      await processAutoFinalizeForGroup(group.id, groupSlug);
     });
 
     const event = await getCurrentEvent(group.id);

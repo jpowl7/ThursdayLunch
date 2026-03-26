@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import type { Event } from "@/lib/schemas";
 import type { ReactNode } from "react";
 
@@ -12,9 +15,31 @@ function formatDate(dateStr: string): string {
   return date.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 
+function formatCountdown(deadline: Date): string {
+  const now = new Date();
+  const diff = deadline.getTime() - now.getTime();
+  if (diff <= 0) return "Closing soon…";
+  const totalMin = Math.ceil(diff / 60000);
+  if (totalMin < 60) return `${totalMin}m`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+
 export function EventHeader({ event, shareButton }: EventHeaderProps) {
   const isOpen = event.status === "open";
   const isFinalized = event.status === "finalized";
+  const deadlineStr = event.votingDeadline;
+  const deadline = deadlineStr ? new Date(deadlineStr) : null;
+  const [countdown, setCountdown] = useState(deadline ? formatCountdown(deadline) : "");
+
+  useEffect(() => {
+    if (!deadlineStr || !isOpen) return;
+    const d = new Date(deadlineStr);
+    setCountdown(formatCountdown(d));
+    const interval = setInterval(() => setCountdown(formatCountdown(d)), 30000);
+    return () => clearInterval(interval);
+  }, [deadlineStr, isOpen]);
 
   const statusText = isOpen
     ? `Voting open for ${formatDate(event.date)}`
@@ -50,6 +75,14 @@ export function EventHeader({ event, shareButton }: EventHeaderProps) {
       <h1 className="text-2xl font-bold tracking-tight text-slate-900 break-words">
         {event.title}
       </h1>
+      {isOpen && deadline && countdown && (
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <span className="material-symbols-outlined text-amber-500 text-[16px]">timer</span>
+          <span className="text-xs font-medium text-amber-600">
+            Voting closes in {countdown}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

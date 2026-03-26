@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import type { EventSnapshot } from "@/types";
 
 interface FinalizeControlsProps {
@@ -81,6 +82,74 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
+  // Voting deadline state
+  const existingDeadline = event.votingDeadline ? new Date(event.votingDeadline) : null;
+  const existingDeadlineTime = existingDeadline
+    ? existingDeadline.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Indiana/Indianapolis" })
+    : "";
+  const [deadlineTime, setDeadlineTime] = useState(existingDeadlineTime);
+  const [savingDeadline, setSavingDeadline] = useState(false);
+
+  const handleSetDeadline = async () => {
+    setSavingDeadline(true);
+    try {
+      // Convert time to full ISO timestamp using event date + Eastern timezone
+      let votingDeadline: string | null = null;
+      if (deadlineTime) {
+        const utcGuess = new Date(`${event.date}T${deadlineTime}:00Z`);
+        const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
+        const offsetMs = inEastern.getTime() - utcGuess.getTime();
+        votingDeadline = new Date(utcGuess.getTime() - offsetMs).toISOString();
+      }
+
+      const res = await fetch(`/api/events/${event.id}/deadline`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ votingDeadline }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to update deadline");
+        return;
+      }
+      toast.success(votingDeadline ? "Voting deadline set!" : "Voting deadline cleared");
+      onFinalized(); // refresh snapshot
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSavingDeadline(false);
+    }
+  };
+
+  const handleClearDeadline = async () => {
+    setDeadlineTime("");
+    setSavingDeadline(true);
+    try {
+      const res = await fetch(`/api/events/${event.id}/deadline`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ votingDeadline: null }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to clear deadline");
+        return;
+      }
+      toast.success("Voting deadline cleared");
+      onFinalized();
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSavingDeadline(false);
+    }
+  };
+
   const sortedLocations = [...eligibleLocations].sort(
     (a, b) => (weightedScores.get(b.id) || 0) - (weightedScores.get(a.id) || 0)
   );
@@ -158,6 +227,48 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
         />
       </div>
 
+      {/* Voting Deadline Section */}
+      <div className="space-y-2 pt-2 border-t border-orange-500/10">
+        <Label className="text-sm font-medium px-1 flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-[16px]">timer</span>
+          Auto-Finalize Deadline
+        </Label>
+        {existingDeadline ? (
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+              <span className="font-medium">Voting closes at </span>
+              {existingDeadline.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" })}
+            </div>
+            <button
+              onClick={handleClearDeadline}
+              disabled={savingDeadline}
+              className="px-3 py-2 text-sm font-medium text-red-400 hover:text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              value={deadlineTime}
+              onChange={(e) => setDeadlineTime(e.target.value)}
+              className="flex-1 bg-white border border-orange-500/20 rounded-full px-4 py-2 focus:ring-2 focus:ring-orange-500 focus:border-transparent outline-none text-sm"
+            />
+            <button
+              onClick={handleSetDeadline}
+              disabled={savingDeadline || !deadlineTime}
+              className="px-4 py-2 text-sm font-semibold rounded-full bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+            >
+              {savingDeadline ? "..." : "Set"}
+            </button>
+          </div>
+        )}
+        <p className="text-[11px] text-slate-400 px-1">
+          Top-voted venue + peak time will be auto-selected when the deadline passes
+        </p>
+      </div>
+
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
       <button
@@ -166,7 +277,7 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
         className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-4 rounded-full shadow-lg shadow-orange-500/30 transition-all flex items-center justify-center gap-2 mt-4"
       >
         <span className="material-symbols-outlined">check_circle</span>
-        {submitting ? "Finalizing..." : "Finalize Event"}
+        {submitting ? "Finalizing..." : "Finalize Now"}
       </button>
 
       {inCount > 0 && (

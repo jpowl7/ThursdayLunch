@@ -31,6 +31,7 @@ export const EventSchema = z.object({
   goLiveAt: z.string().nullable(),
   delayStartAt: z.string().nullable(),
   delayEndAt: z.string().nullable(),
+  votingDeadline: z.string().nullable(),
 });
 
 export const CreateEventSchema = z.object({
@@ -43,6 +44,7 @@ export const CreateEventSchema = z.object({
   delayWindow: z.enum(["none", "15", "30", "60", "120"]).optional().default("none"),
   delayStartTime: z.string().optional(),
   delayStartDate: z.string().optional(),
+  votingDeadlineTime: z.string().optional(),
 });
 
 export const AddLocationSchema = z.object({

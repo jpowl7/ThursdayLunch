@@ -111,7 +111,7 @@ export function Leaderboard({ currentName, groupSlug }: { currentName: string | 
         unit="lunches"
       />
       <LeaderboardSection
-        title="Perfect Attendance"
+        title="Hot Streak"
         icon="local_fire_department"
         description="Consecutive lunches attended in a row"
         entries={data.streaks}
@@ -157,6 +157,14 @@ export function Leaderboard({ currentName, groupSlug }: { currentName: string | 
         entries={data.trendsetter}
         currentName={currentName}
         unit="wins"
+      />
+      <LeaderboardSection
+        title="Flip Flopper"
+        icon="sync"
+        description="Most response changes across events"
+        entries={data.flipFlopper}
+        currentName={currentName}
+        unit="flips"
       />
       <LeaderboardSection
         title="Cone of Shame"
