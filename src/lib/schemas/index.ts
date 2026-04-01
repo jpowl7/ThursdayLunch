@@ -4,3 +4,5 @@ export { ResponseSchema, UpsertResponseSchema, ToggleResponseSchema, ToggleNoSho
 export type { Response, UpsertResponseInput } from "./response";
 export { PushSubscribeSchema, PushUnsubscribeSchema } from "./notification";
 export type { PushSubscribeInput, PushUnsubscribeInput } from "./notification";
+export { UpsertRecurringScheduleSchema } from "./recurring";
+export type { UpsertRecurringScheduleInput } from "./recurring";

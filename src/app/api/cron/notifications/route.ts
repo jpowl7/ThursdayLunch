@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAllGroupIds, claimGoLiveNotifications, claimHeadsUpNotifications } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
+import { processRecurringSchedules } from "@/lib/recurring-events";
 
 export async function GET() {
   // Public endpoint — safe because claim queries are atomic and idempotent
@@ -44,5 +45,8 @@ export async function GET() {
   // Check for events past their voting deadline
   const autoFinalizeCount = await processAutoFinalizeAll();
 
-  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount });
+  // Auto-create events from recurring schedules
+  const recurringCount = await processRecurringSchedules();
+
+  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount });
 }

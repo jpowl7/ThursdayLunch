@@ -181,11 +181,6 @@ export default function LandingPage() {
                       </div>
 
                       <div>
-                        <p className="text-sm font-semibold text-slate-700">Is this free?</p>
-                        <p className="text-sm text-slate-500">Yep, totally free.</p>
-                      </div>
-
-                      <div>
                         <p className="text-sm font-semibold text-slate-700">Have feedback?</p>
                         <p className="text-sm text-slate-500">
                           Shoot an email to{" "}
@@ -194,7 +189,10 @@ export default function LandingPage() {
                       </div>
                     </div>
 
-                    <p className="text-xs text-slate-400 text-right">&mdash; Jason Powell</p>
+                    <div className="border-t border-slate-100 pt-3 space-y-1">
+                      <p className="text-xs text-slate-400">Version {process.env.NEXT_PUBLIC_APP_VERSION}</p>
+                      <p className="text-xs text-slate-400">&copy; 2025 Jason Powell. All rights reserved.</p>
+                    </div>
                   </div>
                 )}
               </div>

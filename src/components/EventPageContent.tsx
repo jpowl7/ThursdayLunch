@@ -266,7 +266,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
           <div className="flex items-center justify-center py-24">
             <div className="text-center">
               <span className="material-symbols-outlined text-slate-300 text-[64px] mb-2">restaurant</span>
-              <p className="text-2xl font-bold mb-2 text-slate-700">No lunch scheduled yet</p>
+              <p className="text-2xl font-bold mb-2 text-slate-700">No meal scheduled yet</p>
               <p className="text-slate-400">Check back later!</p>
             </div>
           </div>

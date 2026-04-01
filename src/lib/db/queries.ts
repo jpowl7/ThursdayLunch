@@ -837,6 +837,94 @@ export async function getPushSubscriptionsForGroup(groupId: string, excludeParti
   }));
 }
 
+// ── Recurring schedule queries ────────────────────────────────
+
+export async function getRecurringSchedule(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT * FROM recurring_schedules WHERE group_id = ${groupId}
+  `;
+  return rows[0] ? mapRecurringSchedule(rows[0]) : null;
+}
+
+export async function upsertRecurringSchedule(
+  groupId: string,
+  input: {
+    dayOfWeek: number;
+    titleTemplate: string;
+    earliestTime: string;
+    latestTime: string;
+    createDaysBefore: number;
+    delayWindow: string;
+    delayStartTime: string | null;
+    votingDeadlineTime: string | null;
+    active: boolean;
+  }
+) {
+  const sql = getDb();
+  const rows = await sql`
+    INSERT INTO recurring_schedules (
+      group_id, day_of_week, title_template, earliest_time, latest_time,
+      create_days_before, delay_window, delay_start_time, voting_deadline_time, active
+    ) VALUES (
+      ${groupId}, ${input.dayOfWeek}, ${input.titleTemplate}, ${input.earliestTime},
+      ${input.latestTime}, ${input.createDaysBefore}, ${input.delayWindow},
+      ${input.delayStartTime}, ${input.votingDeadlineTime}, ${input.active}
+    )
+    ON CONFLICT (group_id) DO UPDATE SET
+      day_of_week = EXCLUDED.day_of_week,
+      title_template = EXCLUDED.title_template,
+      earliest_time = EXCLUDED.earliest_time,
+      latest_time = EXCLUDED.latest_time,
+      create_days_before = EXCLUDED.create_days_before,
+      delay_window = EXCLUDED.delay_window,
+      delay_start_time = EXCLUDED.delay_start_time,
+      voting_deadline_time = EXCLUDED.voting_deadline_time,
+      active = EXCLUDED.active,
+      updated_at = now()
+    RETURNING *
+  `;
+  return rows[0] ? mapRecurringSchedule(rows[0]) : null;
+}
+
+export async function deleteRecurringSchedule(groupId: string) {
+  const sql = getDb();
+  await sql`DELETE FROM recurring_schedules WHERE group_id = ${groupId}`;
+}
+
+export async function getActiveRecurringSchedules() {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT rs.*, g.slug AS group_slug
+    FROM recurring_schedules rs
+    JOIN groups g ON g.id = rs.group_id
+    WHERE rs.active = TRUE
+  `;
+  return rows.map((r) => ({
+    ...mapRecurringSchedule(r),
+    groupSlug: r.group_slug as string,
+  }));
+}
+
+export async function eventExistsForDate(groupId: string, date: string): Promise<boolean> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1 FROM events
+    WHERE group_id = ${groupId} AND date = ${date} AND status != 'cancelled'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function updateRecurringScheduleLastCreated(groupId: string, date: string) {
+  const sql = getDb();
+  await sql`
+    UPDATE recurring_schedules
+    SET last_created_date = ${date}, updated_at = now()
+    WHERE group_id = ${groupId}
+  `;
+}
+
 // ── Row mappers ──────────────────────────────────────────────
 
 function mapEvent(row: Record<string, unknown>) {
@@ -923,5 +1011,24 @@ function mapParticipant(row: Record<string, unknown>) {
     pin: row.pin as string,
     participantKey: row.participant_key as string,
     createdAt: String(row.created_at),
+  };
+}
+
+function mapRecurringSchedule(row: Record<string, unknown>) {
+  return {
+    id: row.id as string,
+    groupId: row.group_id as string,
+    dayOfWeek: Number(row.day_of_week),
+    titleTemplate: row.title_template as string,
+    earliestTime: normalizeTime(row.earliest_time),
+    latestTime: normalizeTime(row.latest_time),
+    createDaysBefore: Number(row.create_days_before),
+    delayWindow: row.delay_window as string,
+    delayStartTime: row.delay_start_time ? normalizeTime(row.delay_start_time) : null,
+    votingDeadlineTime: row.voting_deadline_time ? normalizeTime(row.voting_deadline_time) : null,
+    active: row.active as boolean,
+    lastCreatedDate: row.last_created_date ? normalizeDate(row.last_created_date) : null,
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
   };
 }

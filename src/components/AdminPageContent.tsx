@@ -7,6 +7,7 @@ import { SummaryPanel } from "@/components/admin/SummaryPanel";
 import { FinalizeControls } from "@/components/admin/FinalizeControls";
 import { FinalizedBanner } from "@/components/event/FinalizedBanner";
 import { AdminLocationManager } from "@/components/admin/AdminLocationManager";
+import { RecurringScheduleForm } from "@/components/admin/RecurringScheduleForm";
 import { AdminResponseManager } from "@/components/admin/AdminResponseManager";
 import { PlacesAutocomplete } from "@/components/PlacesAutocomplete";
 import { useEventStream } from "@/hooks/useEventStream";
@@ -433,9 +434,10 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
                   setLocationSearch(name);
                   setSelectedLocationPlaceId(placeId);
                 }}
-                placeholder="Search for a city or area…"
-                types="locality,sublocality,neighborhood,postal_code,administrative_area_level_3,street_address,premise,point_of_interest,establishment"
+                placeholder="Search for a city, zip, or workplace…"
+                types="locality,sublocality,neighborhood,postal_code,establishment"
               />
+              <p className="text-xs text-slate-400">Try a city, zip code, neighborhood, or your workplace</p>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -503,6 +505,11 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
             </div>
           )}
         </div>
+
+        {/* Recurring Schedule Section */}
+        {activePasscode && (
+          <RecurringScheduleForm groupSlug={groupSlug} token={activePasscode} />
+        )}
 
         {/* Change Passcode Section — hidden for open/demo groups */}
         {!isOpenGroup && <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
