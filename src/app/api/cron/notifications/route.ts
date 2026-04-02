@@ -31,7 +31,9 @@ export async function GET() {
       const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" });
       const windowStart = headsUp.delay_start_at ? fmt(new Date(String(headsUp.delay_start_at))) : "";
       const windowEnd = headsUp.delay_end_at ? fmt(new Date(String(headsUp.delay_end_at))) : "";
-      const eventDate = new Date(String(headsUp.date)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Indiana/Indianapolis" });
+      const dateStr = String(headsUp.date);
+      const dateOnly = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
+      const eventDate = new Date(dateOnly + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 
       await sendPushToGroup(group.id, {
         title: String(headsUp.title),
