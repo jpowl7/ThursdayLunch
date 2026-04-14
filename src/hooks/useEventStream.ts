@@ -27,7 +27,7 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
     if (pollingRef.current) return;
     setConnectionState("polling");
     fetchSnapshot();
-    pollingRef.current = setInterval(fetchSnapshot, 2000);
+    pollingRef.current = setInterval(fetchSnapshot, 15000);
   }, [fetchSnapshot]);
 
   const stopPolling = useCallback(() => {
@@ -40,36 +40,62 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
   useEffect(() => {
     if (!eventId) return;
 
-    setConnectionState("connecting");
-    const es = new EventSource(`/api/events/${eventId}/stream`);
-    eventSourceRef.current = es;
+    let cancelled = false;
 
-    es.onopen = () => {
-      setConnectionState("connected");
-      stopPolling();
+    const connect = () => {
+      if (cancelled) return;
+      setConnectionState("connecting");
+      const es = new EventSource(`/api/events/${eventId}/stream`);
+      eventSourceRef.current = es;
+
+      es.onopen = () => {
+        setConnectionState("connected");
+        stopPolling();
+      };
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data) as EventSnapshot;
+          setSnapshot(data);
+        } catch {
+          // ignore parse errors
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        eventSourceRef.current = null;
+        if (!cancelled && !document.hidden) startPolling();
+      };
     };
 
-    es.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data) as EventSnapshot;
-        setSnapshot(data);
-      } catch {
-        // ignore parse errors
+    const disconnect = () => {
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      stopPolling();
+      setConnectionState("disconnected");
+    };
+
+    const handleVisibility = () => {
+      if (document.hidden) {
+        disconnect();
+      } else if (!eventSourceRef.current) {
+        fetchSnapshot();
+        connect();
       }
     };
 
-    es.onerror = () => {
-      es.close();
-      eventSourceRef.current = null;
-      startPolling();
-    };
+    if (!document.hidden) connect();
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      es.close();
-      eventSourceRef.current = null;
-      stopPolling();
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibility);
+      disconnect();
     };
-  }, [eventId, startPolling, stopPolling]);
+  }, [eventId, startPolling, stopPolling, fetchSnapshot]);
 
   const refresh = useCallback(() => {
     fetchSnapshot();

@@ -32,8 +32,8 @@ export async function GET(
       // Send initial snapshot
       await sendSnapshot();
 
-      // Poll every 2 seconds
-      const interval = setInterval(sendSnapshot, 2000);
+      // Poll every 15 seconds to keep Neon compute usage in budget
+      const interval = setInterval(sendSnapshot, 15000);
 
       // Clean up when client disconnects
       request.signal.addEventListener("abort", () => {
