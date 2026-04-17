@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { EventSnapshot } from "@/types";
 
-type ConnectionState = "connecting" | "connected" | "polling" | "disconnected";
+const POLL_INTERVAL = 30000;
+
+type ConnectionState = "polling" | "disconnected";
 
 export function useEventStream(eventId: string | null, groupSlug: string) {
   const [snapshot, setSnapshot] = useState<EventSnapshot | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>("disconnected");
-  const eventSourceRef = useRef<EventSource | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchSnapshot = useCallback(async () => {
@@ -27,7 +28,7 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
     if (pollingRef.current) return;
     setConnectionState("polling");
     fetchSnapshot();
-    pollingRef.current = setInterval(fetchSnapshot, 15000);
+    pollingRef.current = setInterval(fetchSnapshot, POLL_INTERVAL);
   }, [fetchSnapshot]);
 
   const stopPolling = useCallback(() => {
@@ -35,67 +36,28 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
       clearInterval(pollingRef.current);
       pollingRef.current = null;
     }
+    setConnectionState("disconnected");
   }, []);
 
   useEffect(() => {
     if (!eventId) return;
 
-    let cancelled = false;
-
-    const connect = () => {
-      if (cancelled) return;
-      setConnectionState("connecting");
-      const es = new EventSource(`/api/events/${eventId}/stream`);
-      eventSourceRef.current = es;
-
-      es.onopen = () => {
-        setConnectionState("connected");
-        stopPolling();
-      };
-
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data) as EventSnapshot;
-          setSnapshot(data);
-        } catch {
-          // ignore parse errors
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        eventSourceRef.current = null;
-        if (!cancelled && !document.hidden) startPolling();
-      };
-    };
-
-    const disconnect = () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
-      stopPolling();
-      setConnectionState("disconnected");
-    };
-
     const handleVisibility = () => {
       if (document.hidden) {
-        disconnect();
-      } else if (!eventSourceRef.current) {
-        fetchSnapshot();
-        connect();
+        stopPolling();
+      } else {
+        startPolling();
       }
     };
 
-    if (!document.hidden) connect();
+    if (!document.hidden) startPolling();
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      cancelled = true;
       document.removeEventListener("visibilitychange", handleVisibility);
-      disconnect();
+      stopPolling();
     };
-  }, [eventId, startPolling, stopPolling, fetchSnapshot]);
+  }, [eventId, startPolling, stopPolling]);
 
   const refresh = useCallback(() => {
     fetchSnapshot();
