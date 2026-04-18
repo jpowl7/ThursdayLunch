@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { EventSnapshot } from "@/types";
 
-const POLL_INTERVAL = 60000;
+const POLL_INTERVAL = 30000;
 
 type ConnectionState = "polling" | "disconnected";
 
