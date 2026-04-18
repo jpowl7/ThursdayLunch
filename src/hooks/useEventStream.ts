@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { EventSnapshot } from "@/types";
 
-const POLL_INTERVAL = 30000;
+const POLL_INTERVAL = 60000;
 
 type ConnectionState = "polling" | "disconnected";
 
@@ -39,25 +39,33 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
     setConnectionState("disconnected");
   }, []);
 
+  const eventStatus = snapshot?.event?.status ?? null;
+  const isFinalized = eventStatus !== null && eventStatus !== "open";
+
   useEffect(() => {
     if (!eventId) return;
 
     const handleVisibility = () => {
-      if (document.hidden) {
+      if (document.hidden || isFinalized) {
         stopPolling();
       } else {
         startPolling();
       }
     };
 
-    if (!document.hidden) startPolling();
+    if (!document.hidden && !isFinalized) {
+      startPolling();
+    } else if (isFinalized) {
+      stopPolling();
+    }
+
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
       stopPolling();
     };
-  }, [eventId, startPolling, stopPolling]);
+  }, [eventId, isFinalized, startPolling, stopPolling]);
 
   const refresh = useCallback(() => {
     fetchSnapshot();

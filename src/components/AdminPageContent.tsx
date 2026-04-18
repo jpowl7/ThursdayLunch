@@ -105,11 +105,16 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
     }
   }, [activePasscode, fetchData]);
 
-  // Poll while a scheduled event is waiting to go live
+  // Poll while a scheduled event is waiting to go live — pause on hidden tab
   useEffect(() => {
     if (!scheduledSnapshot) return;
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => { if (!interval) interval = setInterval(fetchData, 30000); };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVisibility = () => { if (document.hidden) { stop(); } else { start(); } };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { document.removeEventListener("visibilitychange", onVisibility); stop(); };
   }, [scheduledSnapshot, fetchData]);
 
   const handlePasscodeSubmit = async () => {

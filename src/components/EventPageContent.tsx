@@ -57,16 +57,22 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
       .catch(() => setLoading(false));
   }, [apiUrl]);
 
-  // Poll every 30s when there's no event (triggers notification checks server-side)
+  // Poll when there's no event yet — pauses when tab is hidden
   useEffect(() => {
     if (initialSnapshot || loading) return;
-    const interval = setInterval(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const poll = () => {
       fetch(apiUrl)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => { if (data) setInitialSnapshot(data); })
         .catch(() => {});
-    }, 60000);
-    return () => clearInterval(interval);
+    };
+    const start = () => { if (!interval) { poll(); interval = setInterval(poll, 60000); } };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVisibility = () => { if (document.hidden) { stop(); } else { start(); } };
+    if (!document.hidden) start();
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => { document.removeEventListener("visibilitychange", onVisibility); stop(); };
   }, [initialSnapshot, loading, apiUrl]);
 
   const eventId = initialSnapshot?.event?.id || null;
