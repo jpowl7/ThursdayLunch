@@ -4,8 +4,11 @@ import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 import { processRecurringSchedules } from "@/lib/recurring-events";
 
-export async function GET() {
-  // Public endpoint — safe because claim queries are atomic and idempotent
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (process.env.CRON_SECRET && authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const groups = await getAllGroupIds();
   let goLiveCount = 0;

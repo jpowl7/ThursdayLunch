@@ -65,7 +65,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => { if (data) setInitialSnapshot(data); })
         .catch(() => {});
-    }, 30000);
+    }, 60000);
     return () => clearInterval(interval);
   }, [initialSnapshot, loading, apiUrl]);
 

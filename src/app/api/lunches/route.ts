@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
     }
 
     const lunches = await getPastLunches(group.id);
-    return NextResponse.json(lunches);
+    const response = NextResponse.json(lunches);
+    response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=300");
+    return response;
   } catch (error) {
     console.error("Error fetching past lunches:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

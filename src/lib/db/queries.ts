@@ -14,13 +14,14 @@ export async function createGroup(slug: string, name: string, passcode: string) 
 
 export async function getGroupBySlug(slug: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM groups WHERE slug = ${slug}`;
+  const rows = await sql`SELECT id, slug, name, passcode, location_lat, location_lng, location_name, created_at FROM groups WHERE slug = ${slug}`;
   return rows[0] ? mapGroup(rows[0]) : null;
 }
 
 export async function verifyGroupPasscode(slug: string, passcode: string) {
-  const group = await getGroupBySlug(slug);
-  return group && group.passcode === passcode;
+  const sql = getDb();
+  const rows = await sql`SELECT 1 FROM groups WHERE slug = ${slug} AND passcode = ${passcode} LIMIT 1`;
+  return rows.length > 0;
 }
 
 export async function updateGroupPasscode(groupId: string, newPasscode: string) {
@@ -59,7 +60,7 @@ export async function getGroupLocation(slug: string) {
 export async function getGroupByEventId(eventId: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT g.* FROM groups g
+    SELECT g.id, g.slug, g.name, g.passcode, g.location_lat, g.location_lng, g.location_name, g.created_at FROM groups g
     JOIN events e ON e.group_id = g.id
     WHERE e.id = ${eventId}
   `;
@@ -103,7 +104,7 @@ export async function createParticipant(name: string, pin: string, participantKe
 export async function loginParticipant(name: string, pin: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM participants
+    SELECT id, name, pin, participant_key, created_at FROM participants
     WHERE name = ${name} AND pin = ${pin}
   `;
   return rows[0] ? mapParticipant(rows[0]) : null;
@@ -112,7 +113,7 @@ export async function loginParticipant(name: string, pin: string) {
 export async function getParticipantByKey(participantKey: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM participants
+    SELECT id, name, pin, participant_key, created_at FROM participants
     WHERE participant_key = ${participantKey}
   `;
   return rows[0] ? mapParticipant(rows[0]) : null;
@@ -121,7 +122,7 @@ export async function getParticipantByKey(participantKey: string) {
 export async function getParticipantByName(name: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM participants
+    SELECT id, name, pin, participant_key, created_at FROM participants
     WHERE LOWER(name) = LOWER(${name})
   `;
   return rows[0] ? mapParticipant(rows[0]) : null;
@@ -142,14 +143,14 @@ export async function updateParticipantPin(participantKey: string, currentPin: s
 
 export async function getCurrentEvent(groupId: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} AND (go_live_at IS NULL OR go_live_at <= NOW()) AND (created_at > NOW() - INTERVAL '24 hours' OR date >= CURRENT_DATE) ORDER BY created_at DESC LIMIT 1`;
+  const rows = await sql`SELECT id FROM events WHERE status IN ('open', 'finalized') AND group_id = ${groupId} AND (go_live_at IS NULL OR go_live_at <= NOW()) AND (created_at > NOW() - INTERVAL '24 hours' OR date >= CURRENT_DATE) ORDER BY created_at DESC LIMIT 1`;
   return rows[0] || null;
 }
 
 export async function getScheduledEvent(groupId: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM events
+    SELECT id FROM events
     WHERE status = 'open' AND group_id = ${groupId}
       AND go_live_at IS NOT NULL AND go_live_at > NOW()
     ORDER BY created_at DESC LIMIT 1
@@ -205,7 +206,7 @@ export async function updateVotingDeadline(eventId: string, votingDeadline: stri
 
 export async function getEventById(id: string) {
   const sql = getDb();
-  const rows = await sql`SELECT * FROM events WHERE id = ${id}`;
+  const rows = await sql`SELECT id, status FROM events WHERE id = ${id}`;
   return rows[0] || null;
 }
 
@@ -213,9 +214,9 @@ export async function getEventSnapshot(eventId: string) {
   const sql = getDb();
 
   const [eventRows, locationRows, responseRows] = await Promise.all([
-    sql`SELECT * FROM events WHERE id = ${eventId}`,
-    sql`SELECT * FROM locations WHERE event_id = ${eventId} ORDER BY created_at`,
-    sql`SELECT r.*, COALESCE(
+    sql`SELECT id, title, date, earliest_time, latest_time, status, chosen_time, chosen_location_id, group_id, created_at, go_live_at, delay_start_at, delay_end_at, voting_deadline FROM events WHERE id = ${eventId}`,
+    sql`SELECT id, event_id, name, address, maps_url, website_url, added_by, created_at FROM locations WHERE event_id = ${eventId} ORDER BY created_at`,
+    sql`SELECT r.id, r.event_id, r.participant_key, r.name, r.status, r.available_from, r.available_to, r.preferred_location_id, r.veto_location_id, r.veto_reason, r.no_show, r.created_at, r.updated_at, COALESCE(
       (SELECT json_agg(lv.location_id) FROM location_votes lv WHERE lv.response_id = r.id),
       '[]'::json
     ) as location_votes
@@ -280,7 +281,7 @@ export async function hasConflictingResponse(eventId: string, participantKey: st
 export async function getResponseByKey(eventId: string, participantKey: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM responses
+    SELECT id, status FROM responses
     WHERE event_id = ${eventId} AND participant_key = ${participantKey}
   `;
   return rows[0] ?? null;
@@ -296,6 +297,9 @@ export async function upsertResponse(
   const vetoReason = input.vetoReason ?? null;
 
   const rows = await sql`
+    WITH old AS (
+      SELECT status FROM responses WHERE event_id = ${eventId} AND participant_key = ${participantKey}
+    )
     INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
     VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
     ON CONFLICT (event_id, participant_key) DO UPDATE SET
@@ -307,7 +311,7 @@ export async function upsertResponse(
       veto_location_id = ${vetoLocationId},
       veto_reason = ${vetoReason},
       updated_at = now()
-    RETURNING *
+    RETURNING *, (SELECT status FROM old) AS previous_status
   `;
 
   const response = rows[0];
@@ -563,33 +567,30 @@ export async function getLeaderboardFirstResponder(groupId: string) {
 
 export async function getLeaderboardStreaks(groupId: string) {
   const sql = getDb();
-  const events = await sql`
-    SELECT e.id
-    FROM events e
-    WHERE e.status = 'finalized' AND e.group_id = ${groupId}
+  const rows = await sql`
+    SELECT r.event_id, r.name, e.date
+    FROM responses r
+    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+    WHERE r.status = 'in' AND r.no_show IS NOT TRUE
     ORDER BY e.date DESC
   `;
-  if (events.length === 0) return [];
+  if (rows.length === 0) return [];
 
-  const eventIds = events.map((e) => e.id as string);
-  const attendees = await sql`
-    SELECT r.event_id, r.name
-    FROM responses r
-    WHERE r.event_id = ANY(${eventIds}) AND r.status = 'in' AND r.no_show IS NOT TRUE
-  `;
+  const eventOrder: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const eid = row.event_id as string;
+    if (!seen.has(eid)) { seen.add(eid); eventOrder.push(eid); }
+  }
 
   const eventAttendees = new Map<string, Set<string>>();
-  for (const row of attendees) {
+  const displayNames = new Map<string, string>();
+  const allNames = new Set<string>();
+  for (const row of rows) {
     const eventId = row.event_id as string;
     const nameLower = (row.name as string).toLowerCase();
     if (!eventAttendees.has(eventId)) eventAttendees.set(eventId, new Set());
     eventAttendees.get(eventId)!.add(nameLower);
-  }
-
-  const displayNames = new Map<string, string>();
-  const allNames = new Set<string>();
-  for (const row of attendees) {
-    const nameLower = (row.name as string).toLowerCase();
     allNames.add(nameLower);
     displayNames.set(nameLower, row.name as string);
   }
@@ -597,8 +598,8 @@ export async function getLeaderboardStreaks(groupId: string) {
   const streaks = new Map<string, number>();
   for (const nameLower of allNames) {
     let streak = 0;
-    for (const event of events) {
-      const set = eventAttendees.get(event.id as string);
+    for (const eventId of eventOrder) {
+      const set = eventAttendees.get(eventId);
       if (set?.has(nameLower)) {
         streak++;
       } else {
@@ -718,7 +719,7 @@ export async function getLeaderboardFlipFlopper(groupId: string) {
 export async function getResponseHistory(eventId: string, name: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM response_history
+    SELECT id, response_id, event_id, name, status, available_from, available_to, preferred_location_id, changed_at FROM response_history
     WHERE event_id = ${eventId} AND LOWER(name) = LOWER(${name})
     ORDER BY changed_at ASC
   `;
@@ -821,11 +822,11 @@ export async function getPushSubscriptionsForGroup(groupId: string, excludeParti
   const sql = getDb();
   const rows = excludeParticipantKey
     ? await sql`
-        SELECT * FROM push_subscriptions
+        SELECT participant_key, group_id, endpoint, p256dh, auth FROM push_subscriptions
         WHERE group_id = ${groupId} AND participant_key != ${excludeParticipantKey}
       `
     : await sql`
-        SELECT * FROM push_subscriptions
+        SELECT participant_key, group_id, endpoint, p256dh, auth FROM push_subscriptions
         WHERE group_id = ${groupId}
       `;
   return rows.map((r) => ({
@@ -842,7 +843,7 @@ export async function getPushSubscriptionsForGroup(groupId: string, excludeParti
 export async function getRecurringSchedule(groupId: string) {
   const sql = getDb();
   const rows = await sql`
-    SELECT * FROM recurring_schedules WHERE group_id = ${groupId}
+    SELECT id, group_id, day_of_week, title_template, earliest_time, latest_time, create_days_before, delay_window, delay_start_time, voting_deadline_time, active, last_created_date, created_at, updated_at FROM recurring_schedules WHERE group_id = ${groupId}
   `;
   return rows[0] ? mapRecurringSchedule(rows[0]) : null;
 }

@@ -12,12 +12,14 @@ export async function GET(
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
-    return NextResponse.json({
+    const response = NextResponse.json({
       slug: group.slug,
       name: group.name,
       requiresPasscode: group.passcode !== "",
       locationName: group.locationName,
     });
+    response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=3600");
+    return response;
   } catch (error) {
     console.error("Error fetching group:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

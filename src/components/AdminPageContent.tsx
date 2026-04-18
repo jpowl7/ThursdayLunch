@@ -108,7 +108,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   // Poll while a scheduled event is waiting to go live
   useEffect(() => {
     if (!scheduledSnapshot) return;
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, [scheduledSnapshot, fetchData]);
 

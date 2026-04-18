@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
-import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse, getResponseByKey } from "@/lib/db/queries";
+import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 
 export async function PUT(
@@ -35,13 +35,10 @@ export async function PUT(
       );
     }
 
-    // Check existing status before upserting to avoid spamming notifications
-    const existing = await getResponseByKey(id, participantKey);
-    const previousStatus = existing?.status ?? null;
-
     const response = await upsertResponse(id, participantKey, input);
 
     // Only send push when status actually changes (or first response)
+    const previousStatus = response.previous_status ?? null;
     const statusChanged = previousStatus !== input.status;
 
     if (statusChanged) {

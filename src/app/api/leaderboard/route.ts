@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
         getLeaderboardFlipFlopper(group.id),
       ]);
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       totalEvents,
       attendance: mapEntries(attendance as unknown as Record<string, unknown>[]),
       tastemaker: mapEntries(tastemaker as unknown as Record<string, unknown>[]),
@@ -58,6 +58,8 @@ export async function GET(request: NextRequest) {
       coneOfShame: mapEntries(coneOfShame as unknown as Record<string, unknown>[]),
       flipFlopper: mapEntries(flipFlopper as unknown as Record<string, unknown>[]),
     });
+    response.headers.set("Cache-Control", "public, s-maxage=300, stale-while-revalidate=300");
+    return response;
   } catch (error) {
     console.error("Error fetching leaderboard:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
