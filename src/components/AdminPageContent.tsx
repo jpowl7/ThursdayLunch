@@ -109,7 +109,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   useEffect(() => {
     if (!scheduledSnapshot) return;
     let interval: ReturnType<typeof setInterval> | null = null;
-    const start = () => { if (!interval) interval = setInterval(fetchData, 30000); };
+    const start = () => { if (!interval) interval = setInterval(fetchData, 3000); };
     const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
     const onVisibility = () => { if (document.hidden) { stop(); } else { start(); } };
     if (!document.hidden) start();
