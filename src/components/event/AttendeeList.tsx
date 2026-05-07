@@ -28,6 +28,7 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
   const inResponses = responses.filter((r) => r.status === "in");
   const maybeResponses = responses.filter((r) => r.status === "maybe");
   const outResponses = responses.filter((r) => r.status === "out");
+  const attendingCount = inResponses.filter((r) => !r.noShow).length;
 
   return (
     <div className="space-y-3">
@@ -36,45 +37,63 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
           <span className="material-symbols-outlined text-orange-500">groups</span>
           Who&apos;s coming?
         </h3>
-        {inResponses.length > 0 && (
+        {attendingCount > 0 && (
           <span className="text-xs font-bold text-orange-500 px-2 py-0.5 bg-orange-500/10 rounded-full">
-            {inResponses.length} {inResponses.length === 1 ? "person" : "people"}
+            {attendingCount} {attendingCount === 1 ? "person" : "people"}
           </span>
         )}
       </div>
       <div className="space-y-2">
         {inResponses.map((r) => {
           const isMe = r.participantKey === currentParticipantKey;
+          const isNoShow = r.noShow === true;
           return (
           <div
             key={r.id}
-            className={`flex items-center gap-4 bg-white p-2.5 rounded-xl shadow-sm ${
-              isMe ? "border-2 border-orange-400 ring-1 ring-orange-400/20" : "border border-slate-50"
+            className={`flex items-center gap-4 p-2.5 rounded-xl shadow-sm ${
+              isNoShow
+                ? "bg-red-50 border border-red-100"
+                : isMe
+                ? "bg-white border-2 border-orange-400 ring-1 ring-orange-400/20"
+                : "bg-white border border-slate-50"
             }`}
           >
             <div className="relative">
               <div className={`size-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white shadow-sm ${
-                isMe ? "bg-orange-200 text-orange-800" : "bg-orange-100 text-orange-700"
+                isNoShow
+                  ? "bg-red-100 text-red-400"
+                  : isMe
+                  ? "bg-orange-200 text-orange-800"
+                  : "bg-orange-100 text-orange-700"
               }`}>
                 {getInitials(r.name)}
               </div>
-              <div className="absolute -bottom-1 -right-1 size-5 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
-                <span className="material-symbols-outlined text-white text-[12px] font-bold">check</span>
+              <div className={`absolute -bottom-1 -right-1 size-5 rounded-full border-2 border-white flex items-center justify-center ${
+                isNoShow ? "bg-red-400" : "bg-green-500"
+              }`}>
+                <span className="material-symbols-outlined text-white text-[12px] font-bold">
+                  {isNoShow ? "close" : "check"}
+                </span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex justify-between items-start">
-                <p className="font-bold text-sm truncate">
-                  {r.name}
-                  {isMe && <span className="text-[10px] text-orange-500 font-bold ml-1.5">(You)</span>}
-                </p>
-                {r.availableFrom && r.availableTo && (
+                <div className="min-w-0">
+                  <p className={`font-bold text-sm truncate ${isNoShow ? "line-through text-red-400" : ""}`}>
+                    {r.name}
+                    {isMe && <span className="text-[10px] text-orange-500 font-bold ml-1.5">(You)</span>}
+                  </p>
+                  {isNoShow && (
+                    <p className="text-[11px] text-red-400 font-medium">No-show</p>
+                  )}
+                </div>
+                {!isNoShow && r.availableFrom && r.availableTo && (
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter whitespace-nowrap ml-2">
                     {formatTime(r.availableFrom)} - {formatTime(r.availableTo)}
                   </span>
                 )}
               </div>
-              {r.locationVotes.length > 0 && (
+              {!isNoShow && r.locationVotes.length > 0 && (
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
                   {r.locationVotes.map((locId) => {
                     const isPreferred = r.preferredLocationId === locId;
