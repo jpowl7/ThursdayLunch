@@ -67,7 +67,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
         .then((data) => { if (data) setInitialSnapshot(data); })
         .catch(() => {});
     };
-    const start = () => { if (!interval) { poll(); interval = setInterval(poll, 60000); } };
+    const start = () => { if (!interval) { poll(); interval = setInterval(poll, 300000); } };
     const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
     const onVisibility = () => { if (document.hidden) { stop(); } else { start(); } };
     if (!document.hidden) start();
