@@ -5,6 +5,7 @@ import {
   updateRecurringScheduleLastCreated,
 } from "./db/queries";
 import { sendPushToGroup } from "./push";
+import { notifyOwner } from "./owner-email";
 
 const TZ = "America/Indiana/Indianapolis";
 
@@ -118,6 +119,11 @@ export async function processRecurringSchedules(): Promise<number> {
       );
 
       await updateRecurringScheduleLastCreated(schedule.groupId, nextEventDate);
+
+      await notifyOwner(
+        `[ilikelunch] Recurring meal auto-created: ${schedule.groupSlug}`,
+        `A recurring meal was just auto-created.\n\nGroup: ${schedule.groupSlug}\nTitle: ${title}\nDate: ${nextEventDate}\nGoes live: ${goLiveAt ? new Date(goLiveAt).toLocaleString("en-US", { timeZone: TZ }) : "immediately"}\nURL: https://ilikelunch.com/g/${schedule.groupSlug}`
+      );
 
       // Send push for non-delayed events
       if (!goLiveAt && snapshot?.event) {

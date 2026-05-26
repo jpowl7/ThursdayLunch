@@ -4,6 +4,7 @@ import { CreateEventSchema } from "@/lib/schemas";
 import { createEvent, getGroupBySlug } from "@/lib/db/queries";
 import { getPlaceDetails } from "@/lib/google-places";
 import { sendPushToGroup } from "@/lib/push";
+import { notifyOwner } from "@/lib/owner-email";
 
 export async function POST(request: NextRequest) {
   try {
@@ -87,6 +88,13 @@ export async function POST(request: NextRequest) {
     }
 
     const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, headsUpAt, votingDeadline }, resolvedLocations, group.id);
+
+    after(() =>
+      notifyOwner(
+        `[ilikelunch] New meal scheduled: ${group.name}`,
+        `${group.name} scheduled a new meal.\n\nTitle: ${eventInput.title}\nDate: ${eventInput.date}\nGoes live: ${goLiveAt ? new Date(goLiveAt).toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }) : "immediately"}\nURL: https://ilikelunch.com/g/${groupSlug}`
+      )
+    );
 
     // Send push immediately only for non-delayed events
     // Delayed events get a heads-up notification via polling (5 min before window)

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { z } from "zod";
 import { createGroup, getGroupBySlug, listGroups } from "@/lib/db/queries";
+import { notifyOwner } from "@/lib/owner-email";
 
 export async function GET() {
   try {
@@ -32,6 +34,14 @@ export async function POST(request: NextRequest) {
     }
 
     const group = await createGroup(parsed.data.slug, parsed.data.name, parsed.data.passcode);
+
+    after(() =>
+      notifyOwner(
+        `[ilikelunch] New group: ${group.name}`,
+        `A new group was just created.\n\nName: ${group.name}\nSlug: ${group.slug}\nURL: https://ilikelunch.com/g/${group.slug}`
+      )
+    );
+
     return NextResponse.json({ slug: group.slug, name: group.name }, { status: 201 });
   } catch (error) {
     console.error("Error creating group:", error);
