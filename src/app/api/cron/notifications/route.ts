@@ -3,6 +3,7 @@ import { getAllGroupIds, claimGoLiveNotifications, claimHeadsUpNotifications } f
 import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 import { processRecurringSchedules } from "@/lib/recurring-events";
+import { maybeReseedDemo } from "@/lib/demo-seed";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -53,5 +54,8 @@ export async function GET(request: Request) {
   // Auto-create events from recurring schedules
   const recurringCount = await processRecurringSchedules();
 
-  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount });
+  // Reseed demo group on Thursday at noon ET (idempotent)
+  const demoReseed = await maybeReseedDemo();
+
+  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount, demoReseed });
 }
