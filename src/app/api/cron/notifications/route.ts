@@ -4,6 +4,7 @@ import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 import { processRecurringSchedules } from "@/lib/recurring-events";
 import { maybeReseedDemo } from "@/lib/demo-seed";
+import { cronPlan } from "@/lib/cron-window";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -11,6 +12,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Skip the database entirely outside the windows where work can exist, so Neon's
+  // compute can suspend. See src/lib/cron-window.ts.
+  const plan = cronPlan();
+  if (plan === "skip") {
+    return NextResponse.json({ ok: true, plan });
+  }
+  if (plan === "create-only") {
+    const recurringCount = await processRecurringSchedules();
+    return NextResponse.json({ ok: true, plan, recurringCount });
+  }
+
+  // plan === "full" — Thursday-morning window: run the whole lifecycle.
   const groups = await getAllGroupIds();
   let goLiveCount = 0;
   let headsUpCount = 0;
@@ -57,5 +70,5 @@ export async function GET(request: Request) {
   // Reseed demo group on Thursday at noon ET (idempotent)
   const demoReseed = await maybeReseedDemo();
 
-  return NextResponse.json({ ok: true, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount, demoReseed });
+  return NextResponse.json({ ok: true, plan, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount, demoReseed });
 }
