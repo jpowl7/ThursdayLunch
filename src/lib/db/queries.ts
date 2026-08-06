@@ -741,27 +741,24 @@ export async function getResponseHistory(eventId: string, name: string) {
 export async function getPastLocations(groupId: string, excludeEventId: string) {
   const sql = getDb();
   const rows = await sql`
-    WITH ranked AS (
+    WITH agg AS (
       SELECT
-        l.name,
-        l.address,
-        l.maps_url,
-        l.website_url,
-        COUNT(*)::int AS use_count,
-        ROW_NUMBER() OVER (
-          PARTITION BY LOWER(l.name)
-          ORDER BY l.created_at DESC
-        ) AS rn
+        LOWER(l.name) AS name_key,
+        COUNT(DISTINCT l.event_id)::int AS use_count,
+        MAX(l.created_at) AS last_used,
+        (ARRAY_AGG(l.name ORDER BY l.created_at DESC))[1] AS name,
+        (ARRAY_AGG(l.address ORDER BY l.created_at DESC))[1] AS address,
+        (ARRAY_AGG(l.maps_url ORDER BY l.created_at DESC))[1] AS maps_url,
+        (ARRAY_AGG(l.website_url ORDER BY l.created_at DESC))[1] AS website_url
       FROM locations l
       JOIN events e ON e.id = l.event_id
       WHERE e.group_id = ${groupId}
         AND l.event_id != ${excludeEventId}
-      GROUP BY LOWER(l.name), l.name, l.address, l.maps_url, l.website_url, l.created_at
+      GROUP BY LOWER(l.name)
     )
     SELECT name, address, maps_url, website_url, use_count
-    FROM ranked
-    WHERE rn = 1
-    ORDER BY use_count DESC, name
+    FROM agg
+    ORDER BY last_used DESC, use_count DESC, name
     LIMIT 20
   `;
   return rows.map((r) => ({

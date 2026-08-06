@@ -273,6 +273,7 @@ export function LocationVoting({
                   try {
                     const domain = new URL(loc.websiteUrl).hostname;
                     return (
+                      // eslint-disable-next-line @next/next/no-img-element -- tiny external favicon from a single host; next/image optimization not worthwhile
                       <img
                         src={`https://www.google.com/s2/favicons?domain=${domain}&sz=64`}
                         alt=""
