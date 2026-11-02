@@ -22,7 +22,7 @@ function easternParts(now: Date): { weekday: string; hour: number; minute: numbe
 // The only day with live voting activity (recurring schedule day_of_week = 4 = Thursday).
 const ACTIVE_WEEKDAY = "Thu";
 // Full window covers the whole Thursday-morning lifecycle in Eastern time, with margin:
-//   heads-up (~9:25), go-live (9:30–10:00), voting deadline (11:20), noon demo reseed.
+//   go-live (9:30–10:00), voting deadline (11:20), noon demo reseed.
 const FULL_START_HOUR = 8; // 8:00 AM ET
 const FULL_END_HOUR = 13; // exclusive → runs through 12:59 PM ET
 // One brief pass each morning so schedules that create events ahead of time
@@ -33,7 +33,7 @@ const CREATE_CHECK_HOUR = 8;
  * Decide how much cron work to do — computed purely from the clock, with NO database
  * access, so the database stays asleep outside the windows that can actually have work.
  *
- * - "full": run everything (go-live / heads-up pushes, auto-finalize, recurring creation,
+ * - "full": run everything (go-live pushes, auto-finalize, recurring creation,
  *   demo reseed). Only during the Thursday-morning window.
  * - "create-only": run just the recurring-event check, so a schedule configured to create
  *   its event a few days early still fires. One tick per day.

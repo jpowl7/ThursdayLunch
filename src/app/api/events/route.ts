@@ -20,7 +20,6 @@ export async function POST(request: NextRequest) {
     let goLiveAt: string | null = null;
     let delayStartAt: string | null = null;
     let delayEndAt: string | null = null;
-    let headsUpAt: string | null = null;
     if (delayWindow && delayWindow !== "none") {
       const windowMs = parseInt(delayWindow) * 60 * 1000;
       const delayMs = Math.floor(Math.random() * windowMs);
@@ -42,7 +41,6 @@ export async function POST(request: NextRequest) {
       goLiveAt = new Date(baseMs + delayMs).toISOString();
       delayStartAt = new Date(baseMs).toISOString();
       delayEndAt = new Date(baseMs + windowMs).toISOString();
-      headsUpAt = new Date(baseMs - 5 * 60 * 1000).toISOString(); // 5 min before window start
     }
 
     const group = await getGroupBySlug(groupSlug);
@@ -87,7 +85,7 @@ export async function POST(request: NextRequest) {
       votingDeadline = new Date(utcGuess.getTime() - offsetMs).toISOString();
     }
 
-    const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, headsUpAt, votingDeadline }, resolvedLocations, group.id);
+    const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, votingDeadline }, resolvedLocations, group.id);
 
     after(() =>
       notifyOwner(
@@ -97,7 +95,7 @@ export async function POST(request: NextRequest) {
     );
 
     // Send push immediately only for non-delayed events
-    // Delayed events get a heads-up notification via polling (5 min before window)
+    // Delayed events get their push when they go live (cron)
     if (!goLiveAt) {
       after(async () => {
         await sendPushToGroup(group.id, {

@@ -170,18 +170,6 @@ export async function claimGoLiveNotifications(groupId: string) {
   return rows[0] || null;
 }
 
-export async function claimHeadsUpNotifications(groupId: string) {
-  const sql = getDb();
-  const rows = await sql`
-    UPDATE events SET heads_up_sent = TRUE
-    WHERE group_id = ${groupId} AND status = 'open'
-      AND heads_up_at IS NOT NULL AND heads_up_at <= NOW()
-      AND heads_up_sent = FALSE
-    RETURNING *
-  `;
-  return rows[0] || null;
-}
-
 export async function claimAutoFinalize(groupId: string) {
   const sql = getDb();
   const rows = await sql`
@@ -235,7 +223,7 @@ export async function getEventSnapshot(eventId: string) {
 export async function createEvent(
   input: {
     title: string; date: string; earliestTime: string; latestTime: string;
-    goLiveAt?: string | null; delayStartAt?: string | null; delayEndAt?: string | null; headsUpAt?: string | null;
+    goLiveAt?: string | null; delayStartAt?: string | null; delayEndAt?: string | null;
     votingDeadline?: string | null;
   },
   locations: { name: string; address?: string; mapsUrl?: string; websiteUrl?: string }[],
@@ -247,10 +235,9 @@ export async function createEvent(
   await sql`UPDATE events SET status = 'cancelled' WHERE status = 'open' AND group_id = ${groupId}`;
 
   const notificationsSent = !input.goLiveAt;
-  const headsUpSent = !input.headsUpAt;
   const eventRows = await sql`
-    INSERT INTO events (title, date, earliest_time, latest_time, group_id, go_live_at, notifications_sent, heads_up_at, heads_up_sent, delay_start_at, delay_end_at, voting_deadline)
-    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId}, ${input.goLiveAt || null}, ${notificationsSent}, ${input.headsUpAt || null}, ${headsUpSent}, ${input.delayStartAt || null}, ${input.delayEndAt || null}, ${input.votingDeadline || null})
+    INSERT INTO events (title, date, earliest_time, latest_time, group_id, go_live_at, notifications_sent, heads_up_sent, delay_start_at, delay_end_at, voting_deadline)
+    VALUES (${input.title}, ${input.date}, ${input.earliestTime}, ${input.latestTime}, ${groupId}, ${input.goLiveAt || null}, ${notificationsSent}, TRUE, ${input.delayStartAt || null}, ${input.delayEndAt || null}, ${input.votingDeadline || null})
     RETURNING *
   `;
 

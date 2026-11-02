@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { after } from "next/server";
-import { getScheduledEvent, getEventSnapshot, getGroupBySlug, claimHeadsUpNotifications } from "@/lib/db/queries";
-import { sendPushToGroup } from "@/lib/push";
+import { getScheduledEvent, getEventSnapshot, getGroupBySlug } from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,24 +18,6 @@ export async function GET(request: NextRequest) {
     if (group.passcode !== "" && group.passcode !== passcode) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    // Check for heads-up notifications (5 min before delay window)
-    after(async () => {
-      const headsUp = await claimHeadsUpNotifications(group.id);
-      if (headsUp) {
-        const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" });
-        const windowStart = headsUp.delay_start_at ? fmt(new Date(String(headsUp.delay_start_at))) : "";
-        const windowEnd = headsUp.delay_end_at ? fmt(new Date(String(headsUp.delay_end_at))) : "";
-        const eventDate = new Date(String(headsUp.date)).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "America/Indiana/Indianapolis" });
-
-        await sendPushToGroup(group.id, {
-          title: String(headsUp.title),
-          body: `Lunch for ${eventDate} will randomly open for voting between ${windowStart} and ${windowEnd}`,
-          url: `/g/${groupSlug}`,
-          tag: `event-headsup-${headsUp.id}`,
-        });
-      }
-    });
 
     const event = await getScheduledEvent(group.id);
     if (!event) {

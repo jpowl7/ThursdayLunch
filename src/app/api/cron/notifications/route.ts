@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllGroupIds, claimGoLiveNotifications, claimHeadsUpNotifications } from "@/lib/db/queries";
+import { getAllGroupIds, claimGoLiveNotifications } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 import { processRecurringSchedules } from "@/lib/recurring-events";
@@ -26,7 +26,6 @@ export async function GET(request: Request) {
   // plan === "full" — Thursday-morning window: run the whole lifecycle.
   const groups = await getAllGroupIds();
   let goLiveCount = 0;
-  let headsUpCount = 0;
 
   for (const group of groups) {
     // Check go-live notifications
@@ -41,24 +40,6 @@ export async function GET(request: Request) {
       });
     }
 
-    // Check heads-up notifications
-    const headsUp = await claimHeadsUpNotifications(group.id);
-    if (headsUp) {
-      headsUpCount++;
-      const fmt = (d: Date) => d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" });
-      const windowStart = headsUp.delay_start_at ? fmt(new Date(String(headsUp.delay_start_at))) : "";
-      const windowEnd = headsUp.delay_end_at ? fmt(new Date(String(headsUp.delay_end_at))) : "";
-      const dateStr = String(headsUp.date);
-      const dateOnly = dateStr.includes("T") ? dateStr.split("T")[0] : dateStr;
-      const eventDate = new Date(dateOnly + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
-
-      await sendPushToGroup(group.id, {
-        title: String(headsUp.title),
-        body: `Lunch for ${eventDate} will randomly open for voting between ${windowStart} and ${windowEnd}`,
-        url: `/g/${group.slug}`,
-        tag: `event-headsup-${headsUp.id}`,
-      });
-    }
   }
 
   // Check for events past their voting deadline
@@ -70,5 +51,5 @@ export async function GET(request: Request) {
   // Reseed demo group on Thursday at noon ET (idempotent)
   const demoReseed = await maybeReseedDemo();
 
-  return NextResponse.json({ ok: true, plan, goLiveCount, headsUpCount, autoFinalizeCount, recurringCount, demoReseed });
+  return NextResponse.json({ ok: true, plan, goLiveCount, autoFinalizeCount, recurringCount, demoReseed });
 }

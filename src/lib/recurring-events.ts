@@ -80,7 +80,6 @@ export async function processRecurringSchedules(): Promise<number> {
       let goLiveAt: string | null = null;
       let delayStartAt: string | null = null;
       let delayEndAt: string | null = null;
-      let headsUpAt: string | null = null;
 
       if (schedule.delayWindow !== "none") {
         const windowMs = parseInt(schedule.delayWindow) * 60 * 1000;
@@ -92,7 +91,6 @@ export async function processRecurringSchedules(): Promise<number> {
         goLiveAt = new Date(baseMs + delayMs).toISOString();
         delayStartAt = baseUtc;
         delayEndAt = new Date(baseMs + windowMs).toISOString();
-        headsUpAt = new Date(baseMs - 5 * 60 * 1000).toISOString();
       }
 
       // Compute voting deadline
@@ -111,7 +109,6 @@ export async function processRecurringSchedules(): Promise<number> {
           goLiveAt,
           delayStartAt,
           delayEndAt,
-          headsUpAt,
           votingDeadline,
         },
         [],
