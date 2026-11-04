@@ -21,7 +21,7 @@ export async function DELETE(
     if (passcode) {
       const group = await getGroupByEventId(id);
       if (group && (group.passcode === "" || group.passcode === passcode)) {
-        const deleted = await adminDeleteLocation(locationId);
+        const deleted = await adminDeleteLocation(id, locationId);
         if (!deleted) {
           return NextResponse.json({ error: "Location not found" }, { status: 404 });
         }
@@ -70,7 +70,7 @@ export async function PATCH(
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const updated = await updateLocationName(locationId, parsed.data.name);
+    const updated = await updateLocationName(id, locationId, parsed.data.name);
     if (!updated) {
       return NextResponse.json({ error: "Location not found" }, { status: 404 });
     }

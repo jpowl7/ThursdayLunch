@@ -23,7 +23,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const deleted = await deleteResponse(responseId);
+    const deleted = await deleteResponse(id, responseId);
     if (!deleted) {
       return NextResponse.json({ error: "Response not found" }, { status: 404 });
     }
@@ -66,7 +66,7 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const updated = await toggleNoShow(responseId, parsed.data.noShow);
+    const updated = await toggleNoShow(id, responseId, parsed.data.noShow);
     if (!updated) {
       return NextResponse.json({ error: "Response not found" }, { status: 404 });
     }
@@ -105,7 +105,7 @@ export async function PATCH(
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
     }
 
-    const updated = await toggleResponseStatus(responseId, parsed.data.status);
+    const updated = await toggleResponseStatus(id, responseId, parsed.data.status);
     if (!updated) {
       return NextResponse.json({ error: "Response not found" }, { status: 404 });
     }

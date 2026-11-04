@@ -345,63 +345,74 @@ export async function deleteLocation(locationId: string, participantKey: string)
   return rows[0] || null;
 }
 
-export async function adminDeleteLocation(locationId: string) {
+// Admin mutations below are scoped to the event whose passcode was checked,
+// so one group's admin can't act on another group's rows by guessing IDs.
+
+export async function adminDeleteLocation(eventId: string, locationId: string) {
   const sql = getDb();
   const rows = await sql`
     DELETE FROM locations
-    WHERE id = ${locationId}
+    WHERE id = ${locationId} AND event_id = ${eventId}
     RETURNING *
   `;
   return rows[0] || null;
 }
 
-export async function updateLocationName(locationId: string, name: string) {
+export async function updateLocationName(eventId: string, locationId: string, name: string) {
   const sql = getDb();
   const rows = await sql`
     UPDATE locations SET name = ${name}
-    WHERE id = ${locationId}
+    WHERE id = ${locationId} AND event_id = ${eventId}
     RETURNING *
   `;
   return rows[0] ? mapLocation(rows[0]) : null;
 }
 
-export async function deleteResponse(responseId: string) {
+export async function deleteResponse(eventId: string, responseId: string) {
   const sql = getDb();
-  await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
+  await sql`
+    DELETE FROM location_votes
+    WHERE response_id = ${responseId}
+      AND response_id IN (SELECT id FROM responses WHERE id = ${responseId} AND event_id = ${eventId})
+  `;
   const rows = await sql`
     DELETE FROM responses
-    WHERE id = ${responseId}
+    WHERE id = ${responseId} AND event_id = ${eventId}
     RETURNING *
   `;
   return rows[0] || null;
 }
 
-export async function toggleResponseStatus(responseId: string, status: "in" | "out" | "maybe") {
+export async function toggleResponseStatus(eventId: string, responseId: string, status: "in" | "out" | "maybe") {
   const sql = getDb();
   if (status !== "in") {
     // Clear votes, preference, and veto when toggling to out or maybe
-    await sql`DELETE FROM location_votes WHERE response_id = ${responseId}`;
+    await sql`
+      DELETE FROM location_votes
+      WHERE response_id = ${responseId}
+        AND response_id IN (SELECT id FROM responses WHERE id = ${responseId} AND event_id = ${eventId})
+    `;
     const rows = await sql`
       UPDATE responses
       SET status = ${status}, preferred_location_id = NULL, veto_location_id = NULL, veto_reason = NULL, available_from = NULL, available_to = NULL, updated_at = now()
-      WHERE id = ${responseId}
+      WHERE id = ${responseId} AND event_id = ${eventId}
       RETURNING *
     `;
     return rows[0] || null;
   }
   const rows = await sql`
     UPDATE responses SET status = 'in', updated_at = now()
-    WHERE id = ${responseId}
+    WHERE id = ${responseId} AND event_id = ${eventId}
     RETURNING *
   `;
   return rows[0] || null;
 }
 
-export async function toggleNoShow(responseId: string, noShow: boolean) {
+export async function toggleNoShow(eventId: string, responseId: string, noShow: boolean) {
   const sql = getDb();
   const rows = await sql`
     UPDATE responses SET no_show = ${noShow}, updated_at = now()
-    WHERE id = ${responseId}
+    WHERE id = ${responseId} AND event_id = ${eventId}
     RETURNING *
   `;
   return rows[0] || null;
@@ -409,10 +420,12 @@ export async function toggleNoShow(responseId: string, noShow: boolean) {
 
 export async function finalizeEvent(id: string, chosenTime: string, chosenLocationId: string) {
   const sql = getDb();
+  // The chosen location must belong to this event.
   const rows = await sql`
     UPDATE events
     SET status = 'finalized', chosen_time = ${chosenTime}, chosen_location_id = ${chosenLocationId}
     WHERE id = ${id}
+      AND EXISTS (SELECT 1 FROM locations WHERE id = ${chosenLocationId} AND event_id = ${id})
     RETURNING *
   `;
   return rows[0] || null;

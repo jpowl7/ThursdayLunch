@@ -37,6 +37,9 @@ export async function PATCH(
     }
 
     const updated = await finalizeEvent(id, parsed.data.chosenTime, parsed.data.chosenLocationId);
+    if (!updated) {
+      return NextResponse.json({ error: "Chosen location does not belong to this event" }, { status: 400 });
+    }
 
     after(async () => {
       const snapshot = await getEventSnapshot(id);
