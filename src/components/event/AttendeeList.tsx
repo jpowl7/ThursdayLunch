@@ -3,7 +3,7 @@ import type { Response, Location } from "@/lib/schemas";
 interface AttendeeListProps {
   responses: Response[];
   locations: Location[];
-  currentParticipantKey?: string | null;
+  currentParticipantHash?: string | null;
 }
 
 function formatTime(time: string | null): string {
@@ -23,7 +23,7 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-export function AttendeeList({ responses, locations, currentParticipantKey }: AttendeeListProps) {
+export function AttendeeList({ responses, locations, currentParticipantHash }: AttendeeListProps) {
   const locationMap = new Map(locations.map((l) => [l.id, l.name]));
   const inResponses = responses.filter((r) => r.status === "in");
   const maybeResponses = responses.filter((r) => r.status === "maybe");
@@ -45,7 +45,7 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
       </div>
       <div className="space-y-2">
         {inResponses.map((r) => {
-          const isMe = r.participantKey === currentParticipantKey;
+          const isMe = r.participantHash === currentParticipantHash;
           const isNoShow = r.noShow === true;
           return (
           <div
@@ -121,7 +121,7 @@ export function AttendeeList({ responses, locations, currentParticipantKey }: At
           <>
             <p className="text-xs font-bold text-amber-500 uppercase tracking-widest mt-4 px-1">Maybe ({maybeResponses.length})</p>
             {maybeResponses.map((r) => {
-              const isMe = r.participantKey === currentParticipantKey;
+              const isMe = r.participantHash === currentParticipantHash;
               return (
                 <div
                   key={r.id}

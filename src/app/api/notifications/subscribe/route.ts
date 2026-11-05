@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { PushSubscribeSchema, PushUnsubscribeSchema } from "@/lib/schemas";
-import { upsertPushSubscription, deletePushSubscription, getGroupBySlug } from "@/lib/db/queries";
+import { upsertPushSubscription, deletePushSubscription, getGroupBySlug, isKnownParticipant } from "@/lib/db/queries";
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +14,12 @@ export async function POST(request: NextRequest) {
     const group = await getGroupBySlug(groupSlug);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+
+    // Only keys the app has issued may subscribe; otherwise anyone could pile
+    // junk subscriptions onto every push fan-out.
+    if (!(await isKnownParticipant(participantKey, group.id))) {
+      return NextResponse.json({ error: "Unknown participant" }, { status: 403 });
     }
 
     await upsertPushSubscription(

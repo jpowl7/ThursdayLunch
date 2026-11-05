@@ -1,4 +1,14 @@
+import { createHash } from "node:crypto";
 import { getDb } from "./client";
+
+/**
+ * One-way hash of a participant_key, safe to send to every client.
+ * Clients hash their own key the same way (SHA-256 hex, first 16 chars)
+ * to find "me" in a snapshot without the raw key ever leaving the server.
+ */
+export function hashParticipantKey(key: string): string {
+  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+}
 
 // ── Group queries ──────────────────────────────────────────
 
@@ -126,6 +136,23 @@ export async function getParticipantByName(name: string) {
     WHERE LOWER(name) = LOWER(${name})
   `;
   return rows[0] ? mapParticipant(rows[0]) : null;
+}
+
+/**
+ * Is this key one the app has actually issued? True if it is a registered
+ * participant or has ever RSVP'd to an event in this group. Used to gate
+ * open endpoints (add restaurant, push subscribe) against junk callers.
+ */
+export async function isKnownParticipant(participantKey: string, groupId: string): Promise<boolean> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1 WHERE EXISTS (SELECT 1 FROM participants WHERE participant_key = ${participantKey})
+      OR EXISTS (
+        SELECT 1 FROM responses r JOIN events e ON e.id = r.event_id
+        WHERE r.participant_key = ${participantKey} AND e.group_id = ${groupId}
+      )
+  `;
+  return rows.length > 0;
 }
 
 export async function updateParticipantPin(participantKey: string, currentPin: string, newPin: string) {
@@ -952,7 +979,7 @@ function mapLocation(row: Record<string, unknown>) {
     address: (row.address as string) || null,
     mapsUrl: (row.maps_url as string) || null,
     websiteUrl: (row.website_url as string) || null,
-    addedBy: (row.added_by as string) || null,
+    addedByHash: row.added_by ? hashParticipantKey(String(row.added_by)) : null,
     createdAt: String(row.created_at),
   };
 }
@@ -974,7 +1001,7 @@ function mapResponse(row: Record<string, unknown>) {
   return {
     id: row.id as string,
     eventId: row.event_id as string,
-    participantKey: row.participant_key as string,
+    participantHash: hashParticipantKey(String(row.participant_key)),
     name: row.name as string,
     status: (row.status as "in" | "out" | "maybe") || "out",
     availableFrom: row.available_from ? normalizeTime(row.available_from) : null,

@@ -31,7 +31,10 @@ interface LocationVotingProps {
   onClearVeto?: () => void;
   disabled?: boolean;
   eventId?: string;
+  /** Raw key, sent to the API for add/delete. */
   participantKey?: string;
+  /** Hashed key, compared against addedByHash from the server. */
+  participantHash?: string;
   onLocationAdded?: () => void;
   groupSlug?: string;
 }
@@ -49,6 +52,7 @@ export function LocationVoting({
   disabled,
   eventId,
   participantKey,
+  participantHash,
   onLocationAdded,
   groupSlug,
 }: LocationVotingProps) {
@@ -256,7 +260,7 @@ export function LocationVoting({
           const isPreferred = preferredLocationId === loc.id;
           const count = voteCounts.get(loc.id) || 0;
           const prefs = prefCounts.get(loc.id) || 0;
-          const canDelete = loc.addedBy === participantKey && recentlyAdded.has(loc.id);
+          const canDelete = !!participantHash && loc.addedByHash === participantHash && recentlyAdded.has(loc.id);
           return (
             <div key={loc.id}>
               <div

@@ -61,7 +61,8 @@ export async function PUT(
       });
     }
 
-    return NextResponse.json(response);
+    // Don't echo the raw DB row (it carries participant_key); the client only needs an ack.
+    return NextResponse.json({ ok: true, id: response.id, status: input.status });
   } catch (error) {
     console.error("Error upserting response:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

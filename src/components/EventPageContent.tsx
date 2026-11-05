@@ -28,7 +28,7 @@ interface EventPageContentProps {
 }
 
 export function EventPageContent({ groupSlug }: EventPageContentProps) {
-  const { key: participantKey, setParticipantKey, clearParticipantKey } = useParticipantKey();
+  const { key: participantKey, keyHash: participantHash, setParticipantKey, clearParticipantKey } = useParticipantKey();
   const { name: savedName, setName: persistName, clearName } = useParticipantName();
   const [initialSnapshot, setInitialSnapshot] = useState<EventSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,10 +79,10 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
   const { snapshot: liveSnapshot, connectionState, refresh } = useEventStream(eventId, groupSlug);
   const snapshot = liveSnapshot || initialSnapshot;
 
-  useSnapshotNotifications(snapshot, participantKey);
+  useSnapshotNotifications(snapshot, participantHash);
 
   const myResponse = snapshot?.responses?.find(
-    (r) => r.participantKey === participantKey
+    (r) => r.participantHash === participantHash
   );
 
   const [status, setStatus] = useState<"in" | "out" | "maybe" | null>(null);
@@ -355,6 +355,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
               onClearVeto={status === "in" ? handleClearVeto : undefined}
               eventId={event.id}
               participantKey={status === "in" ? (participantKey ?? undefined) : undefined}
+              participantHash={status === "in" ? (participantHash ?? undefined) : undefined}
               onLocationAdded={status === "in" ? refresh : () => {}}
               disabled={status !== "in"}
               groupSlug={groupSlug}
@@ -371,7 +372,7 @@ export function EventPageContent({ groupSlug }: EventPageContentProps) {
             />
           )}
 
-          <AttendeeList responses={responses} locations={locations} currentParticipantKey={participantKey} />
+          <AttendeeList responses={responses} locations={locations} currentParticipantHash={participantHash} />
 
           <Leaderboard currentName={myResponse?.name ?? savedName ?? null} groupSlug={groupSlug} />
           <PastLunches groupSlug={groupSlug} />

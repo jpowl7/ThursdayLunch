@@ -3,7 +3,7 @@ import { z } from "zod";
 import { loginParticipant } from "@/lib/db/queries";
 
 const LoginSchema = z.object({
-  name: z.string().min(1),
+  name: z.string().trim().min(1).max(50),
   pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
 });
 

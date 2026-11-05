@@ -1,4 +1,4 @@
-export { EventSchema, CreateEventSchema, LocationSchema, CreateLocationInput, AddLocationSchema, DeleteLocationSchema, RenameLocationSchema } from "./event";
+export { EventSchema, CreateEventSchema, LocationSchema, CreateLocationInput, AddLocationSchema, DeleteLocationSchema, RenameLocationSchema, MAX_LOCATIONS_PER_EVENT } from "./event";
 export type { Event, CreateEventInput, Location } from "./event";
 export { ResponseSchema, UpsertResponseSchema, ToggleResponseSchema, ToggleNoShowSchema } from "./response";
 export type { Response, UpsertResponseInput } from "./response";

@@ -27,7 +27,7 @@ function clearBadge() {
 
 export function useSnapshotNotifications(
   snapshot: EventSnapshot | null,
-  participantKey: string | null
+  participantHash: string | null
 ) {
   const prevSnapshotRef = useRef<EventSnapshot | null>(null);
   const initializedRef = useRef(false);
@@ -44,7 +44,7 @@ export function useSnapshotNotifications(
   }, []);
 
   useEffect(() => {
-    if (!snapshot || !participantKey) return;
+    if (!snapshot || !participantHash) return;
 
     // Skip initial load — don't toast on first snapshot
     if (!initializedRef.current) {
@@ -63,7 +63,7 @@ export function useSnapshotNotifications(
     // Build lookup maps
     const prevResponsesByKey = new Map<string, Response>();
     for (const r of prev.responses) {
-      prevResponsesByKey.set(r.participantKey, r);
+      prevResponsesByKey.set(r.participantHash, r);
     }
 
     const locationNameById = new Map<string, string>();
@@ -73,9 +73,9 @@ export function useSnapshotNotifications(
 
     // Detect response changes by others
     for (const r of snapshot.responses) {
-      if (r.participantKey === participantKey) continue;
+      if (r.participantHash === participantHash) continue;
 
-      const prevR = prevResponsesByKey.get(r.participantKey);
+      const prevR = prevResponsesByKey.get(r.participantHash);
 
       if (!prevR) {
         // New participant joined
@@ -121,9 +121,9 @@ export function useSnapshotNotifications(
 
     // Detect participants who left (response removed entirely)
     for (const prevR of prev.responses) {
-      if (prevR.participantKey === participantKey) continue;
+      if (prevR.participantHash === participantHash) continue;
       const stillExists = snapshot.responses.some(
-        (r) => r.participantKey === prevR.participantKey
+        (r) => r.participantHash === prevR.participantHash
       );
       if (!stillExists && prevR.status === "in") {
         messages.push(`${prevR.name} is out`);
@@ -133,12 +133,12 @@ export function useSnapshotNotifications(
     // Detect new locations
     const nameByKey = new Map<string, string>();
     for (const r of snapshot.responses) {
-      nameByKey.set(r.participantKey, r.name);
+      nameByKey.set(r.participantHash, r.name);
     }
     const prevLocationIds = new Set(prev.locations.map((l: Location) => l.id));
     for (const loc of snapshot.locations) {
       if (!prevLocationIds.has(loc.id)) {
-        const adder = loc.addedBy ? nameByKey.get(loc.addedBy) : null;
+        const adder = loc.addedByHash ? nameByKey.get(loc.addedByHash) : null;
         messages.push(adder ? `${adder} added ${loc.name}` : `New spot: ${loc.name}`);
       }
     }
@@ -155,5 +155,5 @@ export function useSnapshotNotifications(
         incrementBadge();
       }
     }
-  }, [snapshot, participantKey]);
+  }, [snapshot, participantHash]);
 }

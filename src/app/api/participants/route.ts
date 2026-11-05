@@ -5,11 +5,11 @@ import { createParticipant, updateParticipantPin, getParticipantByKey } from "@/
 const RegisterSchema = z.object({
   name: z.string().min(1).max(50),
   pin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
-  participantKey: z.string().min(1).optional(),
+  participantKey: z.string().min(1).max(100).optional(),
 });
 
 const ChangePinSchema = z.object({
-  participantKey: z.string().min(1),
+  participantKey: z.string().min(1).max(100),
   currentPin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
   newPin: z.string().regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
 });
