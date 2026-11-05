@@ -263,6 +263,9 @@ export function AttendeeToggle({ status, name, onToggle, disabled, participantKe
         }
         setShowLoginPinDialog(false);
         onToggle(pendingStatus, pendingLoginName, data.participantKey);
+      } else if (res.status === 429) {
+        const data = await res.json().catch(() => ({}));
+        setLoginPinError(data.error || "Too many attempts. Try again later.");
       } else {
         setLoginPinError("Wrong PIN. Try again.");
       }

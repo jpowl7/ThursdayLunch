@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkGroupAdmin } from "@/lib/auth";
 import { DeleteLocationSchema, RenameLocationSchema } from "@/lib/schemas";
 import { deleteLocation, adminDeleteLocation, updateLocationName, getEventById, getGroupByEventId } from "@/lib/db/queries";
 
@@ -20,7 +21,9 @@ export async function DELETE(
     const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
     if (passcode) {
       const group = await getGroupByEventId(id);
-      if (group && (group.passcode === "" || group.passcode === passcode)) {
+      const denied = group ? await checkGroupAdmin(request, group) : null;
+      if (denied?.status === 429) return denied;
+      if (group && !denied) {
         const deleted = await adminDeleteLocation(id, locationId);
         if (!deleted) {
           return NextResponse.json({ error: "Location not found" }, { status: 404 });
@@ -59,10 +62,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const body = await request.json();
     const parsed = RenameLocationSchema.safeParse(body);

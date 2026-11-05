@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getScheduledEvent, getEventSnapshot, getGroupBySlug } from "@/lib/db/queries";
+import { checkGroupAdmin } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,16 +9,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing group parameter" }, { status: 400 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-
     const group = await getGroupBySlug(groupSlug);
     if (!group) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const event = await getScheduledEvent(group.id);
     if (!event) {

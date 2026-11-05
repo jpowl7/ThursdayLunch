@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGroupBySlug, getRecurringSchedule, upsertRecurringSchedule, deleteRecurringSchedule } from "@/lib/db/queries";
 import { UpsertRecurringScheduleSchema } from "@/lib/schemas";
+import { checkGroupAdmin } from "@/lib/auth";
 
 async function authorize(request: NextRequest, slug: string) {
   const group = await getGroupBySlug(slug);
   if (!group) return { error: "Group not found", status: 404 } as const;
-  const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-  if (group.passcode !== "" && group.passcode !== passcode) {
-    return { error: "Unauthorized", status: 401 } as const;
+  const denied = await checkGroupAdmin(request, group);
+  if (denied) {
+    const body = (await denied.json()) as { error: string };
+    return { error: body.error, status: denied.status } as const;
   }
   return { group } as const;
 }

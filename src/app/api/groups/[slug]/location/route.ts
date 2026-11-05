@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyGroupPasscode, updateGroupLocation, getGroupBySlug } from "@/lib/db/queries";
+import { updateGroupLocation, getGroupBySlug } from "@/lib/db/queries";
+import { checkGroupAdmin } from "@/lib/auth";
 import { z } from "zod";
 
 const updateSchema = z.object({
@@ -14,16 +15,13 @@ export async function PATCH(
 ) {
   const { slug } = await params;
 
-  // Auth check
-  const token = request.headers.get("authorization")?.replace("Bearer ", "");
+  // Auth check (open groups with an empty passcode always pass)
   const group = await getGroupBySlug(slug);
   if (!group) {
     return NextResponse.json({ error: "Group not found" }, { status: 404 });
   }
-  // Allow open groups (empty passcode) or valid passcode
-  if (group.passcode && (!token || !(await verifyGroupPasscode(slug, token)))) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await checkGroupAdmin(request, group);
+  if (denied) return denied;
 
   const body = await request.json();
   const parsed = updateSchema.safeParse(body);

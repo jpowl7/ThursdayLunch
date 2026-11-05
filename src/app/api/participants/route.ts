@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { createParticipant, updateParticipantPin, getParticipantByKey } from "@/lib/db/queries";
+import { createParticipant, getParticipantByKey, getParticipantByName, setParticipantPin } from "@/lib/db/queries";
+import { hashCredential } from "@/lib/credentials";
+import { verifyPinAttempt, LOCKOUT_MESSAGE } from "@/lib/auth";
 
 const RegisterSchema = z.object({
   name: z.string().min(1).max(50),
@@ -22,8 +24,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || parsed.error.message }, { status: 400 });
     }
 
+    // One account per name: a second "Alex" with a different PIN would make
+    // login ambiguous, so send them to the login flow instead.
+    const existing = await getParticipantByName(parsed.data.name);
+    if (existing) {
+      return NextResponse.json({ error: "That name is already registered. Use login instead." }, { status: 409 });
+    }
+
     const key = parsed.data.participantKey ?? crypto.randomUUID();
-    const participant = await createParticipant(parsed.data.name, parsed.data.pin, key);
+    const participant = await createParticipant(parsed.data.name, await hashCredential(parsed.data.pin), key);
     return NextResponse.json({ participantKey: participant.participantKey, name: participant.name }, { status: 201 });
   } catch (error) {
     // Unique constraint violation = name+pin combo already taken
@@ -51,10 +60,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "No registered account found" }, { status: 404 });
     }
 
-    const updated = await updateParticipantPin(participantKey, currentPin, newPin);
-    if (!updated) {
+    const result = await verifyPinAttempt(request, participant, currentPin);
+    if (result === "locked") {
+      return NextResponse.json({ error: LOCKOUT_MESSAGE }, { status: 429 });
+    }
+    if (result === "wrong") {
       return NextResponse.json({ error: "Current PIN is incorrect" }, { status: 401 });
     }
+
+    await setParticipantPin(participantKey, await hashCredential(newPin));
 
     return NextResponse.json({ success: true });
   } catch (error) {

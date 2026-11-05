@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getGroupBySlug, updateGroupPasscode, verifyGroupPasscode } from "@/lib/db/queries";
+import { getGroupBySlug, updateGroupPasscode } from "@/lib/db/queries";
+import { hashCredential } from "@/lib/credentials";
+import { checkGroupAdmin, verifyGroupPasscodeAttempt, LOCKOUT_MESSAGE } from "@/lib/auth";
 
 export async function GET(
   _request: NextRequest,
@@ -33,9 +35,16 @@ export async function POST(
   try {
     const { slug } = await params;
     const body = await request.json();
-    const passcode = typeof body.passcode === "string" ? body.passcode : "";
-    const valid = await verifyGroupPasscode(slug, passcode);
-    return NextResponse.json({ valid: !!valid });
+    const passcode = typeof body.passcode === "string" ? body.passcode.slice(0, 20) : "";
+    const group = await getGroupBySlug(slug);
+    if (!group) {
+      return NextResponse.json({ error: "Group not found" }, { status: 404 });
+    }
+    const result = await verifyGroupPasscodeAttempt(request, group, passcode);
+    if (result === "locked") {
+      return NextResponse.json({ valid: false, error: LOCKOUT_MESSAGE }, { status: 429 });
+    }
+    return NextResponse.json({ valid: result === "ok" });
   } catch (error) {
     console.error("Error verifying passcode:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -52,11 +61,12 @@ export async function PATCH(
 ) {
   try {
     const { slug } = await params;
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
     const group = await getGroupBySlug(slug);
-    if (!group || (group.passcode !== "" && group.passcode !== passcode)) {
+    if (!group) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const body = await request.json();
     const parsed = ChangePasscodeSchema.safeParse(body);
@@ -64,7 +74,7 @@ export async function PATCH(
       return NextResponse.json({ error: parsed.error.issues[0]?.message || parsed.error.message }, { status: 400 });
     }
 
-    await updateGroupPasscode(group.id, parsed.data.newPasscode);
+    await updateGroupPasscode(group.id, await hashCredential(parsed.data.newPasscode));
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating group passcode:", error);

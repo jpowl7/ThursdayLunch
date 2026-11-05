@@ -131,7 +131,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       if (data.valid) {
         setActivePasscode(trimmed);
       } else {
-        toast.error("Wrong passcode");
+        toast.error(data.error || "Wrong passcode");
         setLoading(false);
       }
     } catch {

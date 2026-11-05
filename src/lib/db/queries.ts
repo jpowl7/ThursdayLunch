@@ -28,20 +28,47 @@ export async function getGroupBySlug(slug: string) {
   return rows[0] ? mapGroup(rows[0]) : null;
 }
 
-export async function verifyGroupPasscode(slug: string, passcode: string) {
-  const sql = getDb();
-  const rows = await sql`SELECT 1 FROM groups WHERE slug = ${slug} AND passcode = ${passcode} LIMIT 1`;
-  return rows.length > 0;
-}
-
-export async function updateGroupPasscode(groupId: string, newPasscode: string) {
+/** `passcodeHash` is the scrypt string from hashCredential(), or "" for an open group. */
+export async function updateGroupPasscode(groupId: string, passcodeHash: string) {
   const sql = getDb();
   const rows = await sql`
-    UPDATE groups SET passcode = ${newPasscode}
+    UPDATE groups SET passcode = ${passcodeHash}
     WHERE id = ${groupId}
     RETURNING *
   `;
   return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+// ── Auth lockout (see src/lib/auth.ts) ─────────────────────
+
+const AUTH_MAX_FAILURES = 10;
+
+export async function getAuthLockout(keys: string[]): Promise<boolean> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT 1 FROM auth_attempts
+    WHERE key = ANY(${keys}::text[])
+      AND count >= ${AUTH_MAX_FAILURES}
+      AND window_start > now() - interval '15 minutes'
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+export async function recordAuthFailure(keys: string[]): Promise<void> {
+  const sql = getDb();
+  await sql`
+    INSERT INTO auth_attempts (key, count, window_start)
+    SELECT k, 1, now() FROM unnest(${keys}::text[]) AS k
+    ON CONFLICT (key) DO UPDATE SET
+      count = CASE WHEN auth_attempts.window_start < now() - interval '15 minutes' THEN 1 ELSE auth_attempts.count + 1 END,
+      window_start = CASE WHEN auth_attempts.window_start < now() - interval '15 minutes' THEN now() ELSE auth_attempts.window_start END
+  `;
+}
+
+export async function pruneAuthAttempts(): Promise<void> {
+  const sql = getDb();
+  await sql`DELETE FROM auth_attempts WHERE window_start < now() - interval '1 day'`;
 }
 
 export async function updateGroupLocation(slug: string, lat: number, lng: number, name: string) {
@@ -101,23 +128,15 @@ export async function listGroups() {
 
 // ── Participant queries ────────────────────────────────────
 
-export async function createParticipant(name: string, pin: string, participantKey: string) {
+/** `pinHash` is the scrypt string from hashCredential(). */
+export async function createParticipant(name: string, pinHash: string, participantKey: string) {
   const sql = getDb();
   const rows = await sql`
     INSERT INTO participants (name, pin, participant_key)
-    VALUES (${name}, ${pin}, ${participantKey})
+    VALUES (${name}, ${pinHash}, ${participantKey})
     RETURNING *
   `;
   return mapParticipant(rows[0]);
-}
-
-export async function loginParticipant(name: string, pin: string) {
-  const sql = getDb();
-  const rows = await sql`
-    SELECT id, name, pin, participant_key, created_at FROM participants
-    WHERE name = ${name} AND pin = ${pin}
-  `;
-  return rows[0] ? mapParticipant(rows[0]) : null;
 }
 
 export async function getParticipantByKey(participantKey: string) {
@@ -155,12 +174,13 @@ export async function isKnownParticipant(participantKey: string, groupId: string
   return rows.length > 0;
 }
 
-export async function updateParticipantPin(participantKey: string, currentPin: string, newPin: string) {
+/** `pinHash` is the scrypt string from hashCredential(). Verification happens in src/lib/auth.ts. */
+export async function setParticipantPin(participantKey: string, pinHash: string) {
   const sql = getDb();
   const rows = await sql`
     UPDATE participants
-    SET pin = ${newPin}
-    WHERE participant_key = ${participantKey} AND pin = ${currentPin}
+    SET pin = ${pinHash}
+    WHERE participant_key = ${participantKey}
     RETURNING *
   `;
   return rows[0] ? mapParticipant(rows[0]) : null;

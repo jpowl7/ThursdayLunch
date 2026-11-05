@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { loginParticipant } from "@/lib/db/queries";
+import { getParticipantByName } from "@/lib/db/queries";
+import { verifyPinAttempt, recordUnknownLogin, LOCKOUT_MESSAGE } from "@/lib/auth";
 
 const LoginSchema = z.object({
   name: z.string().trim().min(1).max(50),
@@ -15,8 +16,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || parsed.error.message }, { status: 400 });
     }
 
-    const participant = await loginParticipant(parsed.data.name, parsed.data.pin);
+    const participant = await getParticipantByName(parsed.data.name);
     if (!participant) {
+      await recordUnknownLogin(request);
+      return NextResponse.json({ error: "Invalid name or PIN" }, { status: 401 });
+    }
+
+    const result = await verifyPinAttempt(request, participant, parsed.data.pin);
+    if (result === "locked") {
+      return NextResponse.json({ error: LOCKOUT_MESSAGE }, { status: 429 });
+    }
+    if (result === "wrong") {
       return NextResponse.json({ error: "Invalid name or PIN" }, { status: 401 });
     }
 

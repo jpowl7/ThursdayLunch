@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkGroupAdmin } from "@/lib/auth";
 import { getGroupByEventId, getResponseHistory } from "@/lib/db/queries";
 
 export async function GET(
@@ -12,10 +13,8 @@ export async function GET(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const name = request.nextUrl.searchParams.get("name");
     if (!name) {

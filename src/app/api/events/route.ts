@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkGroupAdmin } from "@/lib/auth";
 import { after } from "next/server";
 import { CreateEventSchema } from "@/lib/schemas";
 import { createEvent, getGroupBySlug } from "@/lib/db/queries";
@@ -48,10 +49,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     // Resolve place details for locations with placeId
     const resolvedLocations = await Promise.all(

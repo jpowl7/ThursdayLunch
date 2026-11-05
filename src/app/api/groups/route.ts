@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { createGroup, getGroupBySlug, listGroups } from "@/lib/db/queries";
 import { notifyOwner } from "@/lib/owner-email";
+import { hashCredential } from "@/lib/credentials";
 
 export async function GET() {
   try {
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "A group with that URL already exists" }, { status: 409 });
     }
 
-    const group = await createGroup(parsed.data.slug, parsed.data.name, parsed.data.passcode);
+    const group = await createGroup(parsed.data.slug, parsed.data.name, await hashCredential(parsed.data.passcode));
 
     after(() =>
       notifyOwner(

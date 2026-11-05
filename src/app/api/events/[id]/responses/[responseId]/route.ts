@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkGroupAdmin } from "@/lib/auth";
 import { ToggleResponseSchema, ToggleNoShowSchema } from "@/lib/schemas";
 import { deleteResponse, toggleResponseStatus, toggleNoShow, getEventById, getGroupByEventId } from "@/lib/db/queries";
 
@@ -13,10 +14,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const event = await getEventById(id);
     if (!event) {
@@ -46,10 +45,8 @@ export async function PUT(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const event = await getEventById(id);
     if (!event) {
@@ -89,10 +86,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    const passcode = request.headers.get("authorization")?.replace("Bearer ", "");
-    if (group.passcode !== "" && group.passcode !== passcode) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const denied = await checkGroupAdmin(request, group);
+    if (denied) return denied;
 
     const event = await getEventById(id);
     if (!event) {
