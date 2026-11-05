@@ -10,12 +10,21 @@ interface PlaceSuggestion {
 
 interface PlacesAutocompleteProps {
   value: string;
-  onChange: (name: string, placeId: string | null) => void;
+  /**
+   * `sessionToken` is set when a suggestion is picked. Send it along with the placeId
+   * so Google bills the keystrokes + details lookup as one session instead of each.
+   */
+  onChange: (name: string, placeId: string | null, sessionToken?: string) => void;
   placeholder?: string;
   disabled?: boolean;
   inputClassName?: string;
   groupSlug?: string;
   types?: string;
+}
+
+function newSessionToken(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
 export function PlacesAutocomplete({
@@ -33,6 +42,8 @@ export function PlacesAutocomplete({
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  // One token per "type, then pick" cycle; a fresh one starts after each pick.
+  const sessionTokenRef = useRef<string>(newSessionToken());
 
   // Fetch autocomplete suggestions
   useEffect(() => {
@@ -47,6 +58,7 @@ export function PlacesAutocomplete({
       try {
         let url = `/api/places/autocomplete?input=${encodeURIComponent(value.trim())}${groupSlug ? `&groupSlug=${encodeURIComponent(groupSlug)}` : ""}`;
         if (types) url += `&types=${encodeURIComponent(types)}`;
+        url += `&sessionToken=${encodeURIComponent(sessionTokenRef.current)}`;
         const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
@@ -83,7 +95,8 @@ export function PlacesAutocomplete({
     setHasSelection(true);
     setSuggestions([]);
     setShowSuggestions(false);
-    onChange(s.mainText, s.placeId);
+    onChange(s.mainText, s.placeId, sessionTokenRef.current);
+    sessionTokenRef.current = newSessionToken();
     inputRef.current?.focus();
   };
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentEvent, getEventSnapshot, getGroupBySlug } from "@/lib/db/queries";
+import { getCurrentEventSnapshot } from "@/lib/db/queries";
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,17 +8,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing group parameter" }, { status: 400 });
     }
 
-    const group = await getGroupBySlug(groupSlug);
-    if (!group) {
+    // One database round-trip for group + current event + locations + responses.
+    const { groupFound, snapshot } = await getCurrentEventSnapshot(groupSlug);
+    if (!groupFound) {
       return NextResponse.json({ error: "Group not found" }, { status: 404 });
     }
-
-    const event = await getCurrentEvent(group.id);
-    if (!event) {
+    if (!snapshot) {
       return NextResponse.json({ error: "No open event found" }, { status: 404 });
     }
 
-    const snapshot = await getEventSnapshot(event.id as string);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error("Error fetching current event:", error);

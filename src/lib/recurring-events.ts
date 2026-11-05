@@ -6,16 +6,14 @@ import {
 } from "./db/queries";
 import { sendPushToGroup } from "./push";
 import { notifyOwner } from "./owner-email";
-
-const TZ = "America/Indiana/Indianapolis";
+import { EASTERN_TZ as TZ, easternToUtc, easternToday } from "./eastern-time";
 
 /**
  * Get the next occurrence of a given day_of_week (0=Sun, 4=Thu)
  * on or after today in Eastern time. Returns "YYYY-MM-DD".
  */
 function getNextEventDate(dayOfWeek: number): string {
-  const nowStr = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-  const today = new Date(nowStr + "T12:00:00");
+  const today = new Date(easternToday() + "T12:00:00");
   const todayDow = today.getDay();
   let daysUntil = dayOfWeek - todayDow;
   if (daysUntil < 0) daysUntil += 7;
@@ -23,19 +21,6 @@ function getNextEventDate(dayOfWeek: number): string {
   const next = new Date(today);
   if (daysUntil > 0) next.setDate(today.getDate() + daysUntil);
   return next.toISOString().split("T")[0];
-}
-
-/**
- * Convert a local time (HH:MM) on a given date to a UTC ISO string.
- * Uses the America/Indiana/Indianapolis timezone.
- */
-function localTimeToUtc(date: string, time: string): string {
-  const utcGuess = new Date(`${date}T${time}:00Z`);
-  const inEastern = new Date(
-    utcGuess.toLocaleString("en-US", { timeZone: TZ })
-  );
-  const offsetMs = inEastern.getTime() - utcGuess.getTime();
-  return new Date(utcGuess.getTime() - offsetMs).toISOString();
 }
 
 /** Format a date string as "Apr 9" */
@@ -53,8 +38,7 @@ export async function processRecurringSchedules(): Promise<number> {
       const nextEventDate = getNextEventDate(schedule.dayOfWeek);
 
       // How many days until the event?
-      const nowStr = new Date().toLocaleDateString("en-CA", { timeZone: TZ });
-      const nowDate = new Date(nowStr + "T12:00:00");
+      const nowDate = new Date(easternToday() + "T12:00:00");
       const eventDate = new Date(nextEventDate + "T12:00:00");
       const daysUntil = Math.round(
         (eventDate.getTime() - nowDate.getTime()) / (1000 * 60 * 60 * 24)
@@ -85,7 +69,7 @@ export async function processRecurringSchedules(): Promise<number> {
         const windowMs = parseInt(schedule.delayWindow) * 60 * 1000;
         const delayMs = Math.floor(Math.random() * windowMs);
         const baseTime = schedule.delayStartTime || "09:00";
-        const baseUtc = localTimeToUtc(nextEventDate, baseTime);
+        const baseUtc = easternToUtc(nextEventDate, baseTime);
         const baseMs = new Date(baseUtc).getTime();
 
         goLiveAt = new Date(baseMs + delayMs).toISOString();
@@ -96,7 +80,7 @@ export async function processRecurringSchedules(): Promise<number> {
       // Compute voting deadline
       let votingDeadline: string | null = null;
       if (schedule.votingDeadlineTime) {
-        votingDeadline = localTimeToUtc(nextEventDate, schedule.votingDeadlineTime);
+        votingDeadline = easternToUtc(nextEventDate, schedule.votingDeadlineTime);
       }
 
       // Create event with no locations

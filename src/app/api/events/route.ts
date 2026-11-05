@@ -6,6 +6,7 @@ import { createEvent, getGroupBySlug } from "@/lib/db/queries";
 import { getPlaceDetails } from "@/lib/google-places";
 import { sendPushToGroup } from "@/lib/push";
 import { notifyOwner } from "@/lib/owner-email";
+import { EASTERN_TZ, easternToUtc, easternToday } from "@/lib/eastern-time";
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,15 +30,9 @@ export async function POST(request: NextRequest) {
       // Parse in US Eastern time (Granger, IN) since the time picker is local to the user
       let baseMs = Date.now();
       if (delayStartTime) {
-        const dateStr = delayStartDate || new Date().toLocaleDateString("en-CA", { timeZone: "America/Indiana/Indianapolis" });
-        const utcGuess = new Date(`${dateStr}T${delayStartTime}:00Z`);
-        const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
-        const offsetMs = inEastern.getTime() - utcGuess.getTime();
-        const startDate = new Date(utcGuess.getTime() - offsetMs);
-        if (!isNaN(startDate.getTime()) && startDate.getTime() > Date.now()) {
-          baseMs = startDate.getTime();
-        }
-        // If computed time is in the past, fall back to Date.now()
+        const startMs = new Date(easternToUtc(delayStartDate || easternToday(), delayStartTime)).getTime();
+        // If the requested start is already in the past, start the window now instead.
+        if (startMs > Date.now()) baseMs = startMs;
       }
       goLiveAt = new Date(baseMs + delayMs).toISOString();
       delayStartAt = new Date(baseMs).toISOString();
@@ -56,7 +51,7 @@ export async function POST(request: NextRequest) {
     const resolvedLocations = await Promise.all(
       locations.map(async (loc) => {
         if (loc.placeId) {
-          const details = await getPlaceDetails(loc.placeId);
+          const details = await getPlaceDetails(loc.placeId, loc.sessionToken);
           if (details) {
             return {
               name: loc.name,
@@ -77,11 +72,7 @@ export async function POST(request: NextRequest) {
     // Compute voting deadline if provided
     let votingDeadline: string | null = null;
     if (votingDeadlineTime) {
-      // Convert event date + deadline time to UTC using Eastern time offset
-      const utcGuess = new Date(`${eventInput.date}T${votingDeadlineTime}:00Z`);
-      const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
-      const offsetMs = inEastern.getTime() - utcGuess.getTime();
-      votingDeadline = new Date(utcGuess.getTime() - offsetMs).toISOString();
+      votingDeadline = easternToUtc(eventInput.date, votingDeadlineTime);
     }
 
     const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, votingDeadline }, resolvedLocations, group.id);
@@ -89,7 +80,7 @@ export async function POST(request: NextRequest) {
     after(() =>
       notifyOwner(
         `[ilikelunch] New meal scheduled: ${group.name}`,
-        `${group.name} scheduled a new meal.\n\nTitle: ${eventInput.title}\nDate: ${eventInput.date}\nGoes live: ${goLiveAt ? new Date(goLiveAt).toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }) : "immediately"}\nURL: https://ilikelunch.com/g/${groupSlug}`
+        `${group.name} scheduled a new meal.\n\nTitle: ${eventInput.title}\nDate: ${eventInput.date}\nGoes live: ${goLiveAt ? new Date(goLiveAt).toLocaleString("en-US", { timeZone: EASTERN_TZ }) : "immediately"}\nURL: https://ilikelunch.com/g/${groupSlug}`
       )
     );
 

@@ -24,10 +24,13 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
     }
   }, [groupSlug]);
 
-  const startPolling = useCallback(() => {
+  // `immediate` fetches right away (tab came back into view, data is stale). On first
+  // start the caller has just loaded the snapshot itself, so we only schedule the timer
+  // instead of fetching the same thing a second time.
+  const startPolling = useCallback((immediate: boolean) => {
     if (pollingRef.current) return;
     setConnectionState("polling");
-    fetchSnapshot();
+    if (immediate) fetchSnapshot();
     pollingRef.current = setInterval(fetchSnapshot, POLL_INTERVAL);
   }, [fetchSnapshot]);
 
@@ -49,12 +52,12 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
       if (document.hidden || isFinalized) {
         stopPolling();
       } else {
-        startPolling();
+        startPolling(true);
       }
     };
 
     if (!document.hidden && !isFinalized) {
-      startPolling();
+      startPolling(false);
     } else if (isFinalized) {
       stopPolling();
     }

@@ -43,10 +43,17 @@ export async function POST(
       return NextResponse.json({ error: "A location with that name already exists" }, { status: 409 });
     }
 
-    // Resolve address + maps URL + website
+    // Resolve address + maps URL + website. A quick-add chip already carries these from
+    // the last time the place was used, so it costs no Google call at all.
     let placeInfo: { address: string; mapsUrl: string; websiteUrl?: string | null } | null = null;
     if (parsed.data.placeId) {
-      placeInfo = await getPlaceDetails(parsed.data.placeId);
+      placeInfo = await getPlaceDetails(parsed.data.placeId, parsed.data.sessionToken);
+    } else if (parsed.data.address || parsed.data.mapsUrl) {
+      placeInfo = {
+        address: parsed.data.address ?? "",
+        mapsUrl: parsed.data.mapsUrl ?? "",
+        websiteUrl: parsed.data.websiteUrl ?? null,
+      };
     } else {
       placeInfo = await lookupPlace(parsed.data.name);
     }

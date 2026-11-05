@@ -49,6 +49,7 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const [editingLocation, setEditingLocation] = useState(false);
   const [locationSearch, setLocationSearch] = useState("");
   const [selectedLocationPlaceId, setSelectedLocationPlaceId] = useState<string | null>(null);
+  const [locationSessionToken, setLocationSessionToken] = useState<string | undefined>(undefined);
   const [savingLocation, setSavingLocation] = useState(false);
 
   const apiUrl = `/api/events/current?group=${encodeURIComponent(groupSlug)}`;
@@ -435,9 +436,10 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
             <div className="space-y-2">
               <PlacesAutocomplete
                 value={locationSearch}
-                onChange={(name, placeId) => {
+                onChange={(name, placeId, sessionToken) => {
                   setLocationSearch(name);
                   setSelectedLocationPlaceId(placeId);
+                  setLocationSessionToken(placeId ? sessionToken : undefined);
                 }}
                 placeholder="Search for a city, zip, or workplace…"
                 types="locality,sublocality,neighborhood,postal_code,establishment"
@@ -454,7 +456,9 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
                     setSavingLocation(true);
                     try {
                       // Get place details for lat/lng
-                      const detailsRes = await fetch(`/api/places/details?placeId=${encodeURIComponent(selectedLocationPlaceId)}`);
+                      const detailsRes = await fetch(
+                        `/api/places/details?placeId=${encodeURIComponent(selectedLocationPlaceId)}${locationSessionToken ? `&sessionToken=${encodeURIComponent(locationSessionToken)}` : ""}`
+                      );
                       if (!detailsRes.ok) {
                         toast.error("Could not resolve location");
                         return;

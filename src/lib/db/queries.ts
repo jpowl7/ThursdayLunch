@@ -245,26 +245,85 @@ export async function getEventById(id: string) {
   return rows[0] || null;
 }
 
+// A whole event snapshot in ONE round-trip: the event row plus its locations and
+// responses folded in as JSON arrays. Every sql`` call is a separate HTTPS request to
+// Neon, and this is the query every open tab polls, so it matters most here.
+// Used through sql.query() so the same text serves both lookups below.
+const SNAPSHOT_SELECT = `
+  SELECT e.id, e.title, e.date::text AS date, e.earliest_time, e.latest_time, e.status,
+         e.chosen_time, e.chosen_location_id, e.group_id, e.created_at, e.go_live_at,
+         e.delay_start_at, e.delay_end_at, e.voting_deadline,
+         (SELECT COALESCE(json_agg(json_build_object(
+             'id', l.id, 'event_id', l.event_id, 'name', l.name, 'address', l.address,
+             'maps_url', l.maps_url, 'website_url', l.website_url, 'added_by', l.added_by,
+             'created_at', l.created_at
+           ) ORDER BY l.created_at), '[]'::json)
+          FROM locations l WHERE l.event_id = e.id) AS locations,
+         (SELECT COALESCE(json_agg(json_build_object(
+             'id', r.id, 'event_id', r.event_id, 'participant_key', r.participant_key,
+             'name', r.name, 'status', r.status, 'available_from', r.available_from,
+             'available_to', r.available_to, 'preferred_location_id', r.preferred_location_id,
+             'veto_location_id', r.veto_location_id, 'veto_reason', r.veto_reason,
+             'no_show', r.no_show, 'created_at', r.created_at, 'updated_at', r.updated_at,
+             'location_votes', (SELECT COALESCE(json_agg(lv.location_id), '[]'::json)
+                                FROM location_votes lv WHERE lv.response_id = r.id)
+           ) ORDER BY r.created_at), '[]'::json)
+          FROM responses r WHERE r.event_id = e.id) AS responses
+  FROM events e`;
+
+function asJsonArray(val: unknown): Record<string, unknown>[] {
+  if (Array.isArray(val)) return val as Record<string, unknown>[];
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function mapSnapshotRow(row: Record<string, unknown>) {
+  return {
+    event: mapEvent(row),
+    locations: asJsonArray(row.locations).map(mapLocation),
+    responses: asJsonArray(row.responses).map(mapResponse),
+  };
+}
+
 export async function getEventSnapshot(eventId: string) {
   const sql = getDb();
+  const rows = await sql.query(`${SNAPSHOT_SELECT} WHERE e.id = $1`, [eventId]);
+  return rows[0] ? mapSnapshotRow(rows[0] as Record<string, unknown>) : null;
+}
 
-  const [eventRows, locationRows, responseRows] = await Promise.all([
-    sql`SELECT id, title, date, earliest_time, latest_time, status, chosen_time, chosen_location_id, group_id, created_at, go_live_at, delay_start_at, delay_end_at, voting_deadline FROM events WHERE id = ${eventId}`,
-    sql`SELECT id, event_id, name, address, maps_url, website_url, added_by, created_at FROM locations WHERE event_id = ${eventId} ORDER BY created_at`,
-    sql`SELECT r.id, r.event_id, r.participant_key, r.name, r.status, r.available_from, r.available_to, r.preferred_location_id, r.veto_location_id, r.veto_reason, r.no_show, r.created_at, r.updated_at, COALESCE(
-      (SELECT json_agg(lv.location_id) FROM location_votes lv WHERE lv.response_id = r.id),
-      '[]'::json
-    ) as location_votes
-    FROM responses r WHERE r.event_id = ${eventId} ORDER BY r.created_at`,
-  ]);
-
-  if (!eventRows[0]) return null;
-
-  const event = mapEvent(eventRows[0]);
-  const locations = locationRows.map(mapLocation);
-  const responses = responseRows.map(mapResponse);
-
-  return { event, locations, responses };
+/**
+ * The group's current event (same rule as getCurrentEvent) with its full snapshot,
+ * resolved from the slug in a single query. `groupFound` lets the route tell
+ * "no such group" apart from "no event right now".
+ */
+export async function getCurrentEventSnapshot(groupSlug: string) {
+  const sql = getDb();
+  const rows = await sql.query(
+    `SELECT g.id AS found_group_id, snap.*
+     FROM groups g
+     LEFT JOIN LATERAL (
+       ${SNAPSHOT_SELECT}
+       WHERE e.group_id = g.id
+         AND e.status IN ('open', 'finalized')
+         AND (e.go_live_at IS NULL OR e.go_live_at <= NOW())
+         AND (e.created_at > NOW() - INTERVAL '24 hours' OR e.date >= CURRENT_DATE)
+       ORDER BY e.created_at DESC
+       LIMIT 1
+     ) snap ON TRUE
+     WHERE g.slug = $1`,
+    [groupSlug]
+  );
+  const row = rows[0] as Record<string, unknown> | undefined;
+  if (!row) return { groupFound: false, snapshot: null };
+  if (!row.id) return { groupFound: true, snapshot: null };
+  return { groupFound: true, snapshot: mapSnapshotRow(row) };
 }
 
 export async function createEvent(
@@ -290,14 +349,39 @@ export async function createEvent(
 
   const event = eventRows[0];
 
-  for (const loc of locations) {
+  if (locations.length > 0) {
+    // One multi-row insert instead of one round-trip per location.
     await sql`
       INSERT INTO locations (event_id, name, address, maps_url, website_url)
-      VALUES (${event.id}, ${loc.name}, ${loc.address || null}, ${loc.mapsUrl || null}, ${loc.websiteUrl || null})
+      SELECT ${event.id}, t.name, t.address, t.maps_url, t.website_url
+      FROM unnest(
+        ${locations.map((l) => l.name)}::text[],
+        ${locations.map((l) => l.address || null)}::text[],
+        ${locations.map((l) => l.mapsUrl || null)}::text[],
+        ${locations.map((l) => l.websiteUrl || null)}::text[]
+      ) AS t(name, address, maps_url, website_url)
     `;
   }
 
   return getEventSnapshot(event.id);
+}
+
+/**
+ * Everything the response-save route needs to check before writing, in one query:
+ * does the event exist, is it open, and is this name already taken by someone else.
+ */
+export async function getEventForResponse(eventId: string, participantKey: string, name: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT e.status,
+           EXISTS (
+             SELECT 1 FROM responses r
+             WHERE r.event_id = e.id AND LOWER(r.name) = LOWER(${name}) AND r.participant_key != ${participantKey}
+           ) AS name_conflict
+    FROM events e WHERE e.id = ${eventId}
+  `;
+  if (!rows[0]) return null;
+  return { status: rows[0].status as string, nameConflict: rows[0].name_conflict === true };
 }
 
 export async function hasConflictingResponse(eventId: string, participantKey: string, name: string): Promise<boolean> {
@@ -329,43 +413,69 @@ export async function upsertResponse(
   const sql = getDb();
   const vetoLocationId = input.vetoLocationId ?? null;
   const vetoReason = input.vetoReason ?? null;
+  const votes = input.locationVotes;
 
-  const rows = await sql`
-    WITH old AS (
-      SELECT status FROM responses WHERE event_id = ${eventId} AND participant_key = ${participantKey}
-    )
-    INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
-    VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
-    ON CONFLICT (event_id, participant_key) DO UPDATE SET
-      name = ${input.name},
-      status = ${input.status},
-      available_from = ${input.availableFrom},
-      available_to = ${input.availableTo},
-      preferred_location_id = ${input.preferredLocationId},
-      veto_location_id = ${vetoLocationId},
-      veto_reason = ${vetoReason},
-      updated_at = now()
-    RETURNING *, (SELECT status FROM old) AS previous_status
-  `;
-
-  const response = rows[0];
-
-  // Record history snapshot
-  await sql`
-    INSERT INTO response_history (response_id, event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
-    VALUES (${response.id}, ${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
-  `;
-
-  // Update location votes
-  await sql`DELETE FROM location_votes WHERE response_id = ${response.id}`;
-  for (const locationId of input.locationVotes) {
-    await sql`
+  // All four statements go to Neon in ONE request (and one transaction), so a save is
+  // atomic and costs one round-trip instead of 3 + one per vote. Later statements find
+  // the response by (event_id, participant_key) rather than needing its id back first.
+  const [rows] = await sql.transaction([
+    sql`
+      WITH old AS (
+        SELECT status FROM responses WHERE event_id = ${eventId} AND participant_key = ${participantKey}
+      )
+      INSERT INTO responses (event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
+      VALUES (${eventId}, ${participantKey}, ${input.name}, ${input.status}, ${input.availableFrom}, ${input.availableTo}, ${input.preferredLocationId}, ${vetoLocationId}, ${vetoReason})
+      ON CONFLICT (event_id, participant_key) DO UPDATE SET
+        name = ${input.name},
+        status = ${input.status},
+        available_from = ${input.availableFrom},
+        available_to = ${input.availableTo},
+        preferred_location_id = ${input.preferredLocationId},
+        veto_location_id = ${vetoLocationId},
+        veto_reason = ${vetoReason},
+        updated_at = now()
+      RETURNING id, (SELECT status FROM old) AS previous_status
+    `,
+    // History row only when the answer actually changed (status, time window, top pick,
+    // or veto). Slider nudges that land on the same values and vote-only edits no longer
+    // add rows, which keeps the table small and the Flip Flopper stat honest.
+    sql`
+      INSERT INTO response_history (response_id, event_id, participant_key, name, status, available_from, available_to, preferred_location_id, veto_location_id, veto_reason)
+      SELECT r.id, ${eventId}, ${participantKey}, ${input.name}, ${input.status},
+             ${input.availableFrom}::time, ${input.availableTo}::time,
+             ${input.preferredLocationId}::uuid, ${vetoLocationId}::uuid, ${vetoReason}
+      FROM responses r
+      WHERE r.event_id = ${eventId} AND r.participant_key = ${participantKey}
+        AND (
+          SELECT h.status = ${input.status}
+             AND h.available_from IS NOT DISTINCT FROM ${input.availableFrom}::time
+             AND h.available_to IS NOT DISTINCT FROM ${input.availableTo}::time
+             AND h.preferred_location_id IS NOT DISTINCT FROM ${input.preferredLocationId}::uuid
+             AND h.veto_location_id IS NOT DISTINCT FROM ${vetoLocationId}::uuid
+          FROM response_history h
+          WHERE h.response_id = r.id
+          ORDER BY h.changed_at DESC
+          LIMIT 1
+        ) IS DISTINCT FROM TRUE
+    `,
+    // Votes as a delta: drop the ones no longer selected, add the new ones. A vote that
+    // stays selected keeps its original created_at, which the Trendsetter stat relies on.
+    sql`
+      DELETE FROM location_votes
+      WHERE response_id = (SELECT id FROM responses WHERE event_id = ${eventId} AND participant_key = ${participantKey})
+        AND NOT (location_id = ANY(${votes}::uuid[]))
+    `,
+    sql`
       INSERT INTO location_votes (response_id, location_id)
-      VALUES (${response.id}, ${locationId})
-    `;
-  }
+      SELECT r.id, l.id
+      FROM responses r
+      JOIN locations l ON l.event_id = r.event_id AND l.id = ANY(${votes}::uuid[])
+      WHERE r.event_id = ${eventId} AND r.participant_key = ${participantKey}
+      ON CONFLICT DO NOTHING
+    `,
+  ]);
 
-  return response;
+  return rows[0] as { id: string; previous_status: string | null };
 }
 
 export async function addLocation(
@@ -488,6 +598,9 @@ function normalizeTime(val: unknown): string {
 // Normalize DATE columns to "YYYY-MM-DD" format
 function normalizeDate(val: unknown): string {
   if (!val) return "";
+  // Already a plain date (e.g. selected as date::text) — don't round-trip it through
+  // a JS Date, which would shift it by the process timezone.
+  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
   const d = val instanceof Date ? val : new Date(String(val));
   if (isNaN(d.getTime())) return String(val);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -556,71 +669,156 @@ export async function getPastLunches(groupId: string, limit = 10) {
   }));
 }
 
-export async function getFinalizedEventCount(groupId: string): Promise<number> {
-  const sql = getDb();
-  const rows = await sql`SELECT COUNT(*)::int AS count FROM events WHERE status = 'finalized' AND group_id = ${groupId}`;
-  return rows[0].count;
+type LeaderboardEntry = { name: string; count: number };
+
+function mapEntries(rows: Record<string, unknown>[]): LeaderboardEntry[] {
+  return rows.map((r) => ({ name: r.name as string, count: r.count as number }));
 }
 
-export async function getLeaderboardAttendance(groupId: string) {
+/**
+ * Every leaderboard stat in ONE request to Neon (sql.transaction batches the ten
+ * queries into a single HTTPS call) instead of ten parallel round-trips.
+ */
+export async function getLeaderboard(groupId: string) {
   const sql = getDb();
-  return sql`
-    SELECT MAX(r.name) AS name,
-           COUNT(*)::int AS count
-    FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in' AND r.no_show IS NOT TRUE
-    GROUP BY LOWER(r.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardTastemaker(groupId: string) {
-  const sql = getDb();
-  return sql`
-    SELECT MAX(r.name) AS name,
-           COUNT(*)::int AS count
-    FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in'
-      AND r.preferred_location_id IS NOT NULL
-      AND r.preferred_location_id = e.chosen_location_id
-    GROUP BY LOWER(r.name)
-    ORDER BY count DESC, MIN(r.updated_at) ASC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardFirstResponder(groupId: string) {
-  const sql = getDb();
-  return sql`
-    WITH first_responders AS (
-      SELECT DISTINCT ON (r.event_id)
-             r.name
+  const [
+    countRows, attendance, tastemaker, firstResponder, streakRows,
+    speedDemon, fashionablyLate, trendsetter, coneOfShame, flipFlopper,
+  ] = await sql.transaction([
+    sql`SELECT COUNT(*)::int AS count FROM events WHERE status = 'finalized' AND group_id = ${groupId}`,
+    // Attendance
+    sql`
+      SELECT MAX(r.name) AS name, COUNT(*)::int AS count
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      WHERE r.status = 'in' AND r.no_show IS NOT TRUE
+      GROUP BY LOWER(r.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Tastemaker: top pick matched the chosen venue
+    sql`
+      SELECT MAX(r.name) AS name, COUNT(*)::int AS count
       FROM responses r
       JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
       WHERE r.status = 'in'
-      ORDER BY r.event_id, r.created_at
-    )
-    SELECT MAX(fr.name) AS name,
-           COUNT(*)::int AS count
-    FROM first_responders fr
-    GROUP BY LOWER(fr.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
+        AND r.preferred_location_id IS NOT NULL
+        AND r.preferred_location_id = e.chosen_location_id
+      GROUP BY LOWER(r.name)
+      ORDER BY count DESC, MIN(r.updated_at) ASC, name
+      LIMIT 10
+    `,
+    // First responder
+    sql`
+      WITH first_responders AS (
+        SELECT DISTINCT ON (r.event_id) r.name
+        FROM responses r
+        JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+        WHERE r.status = 'in'
+        ORDER BY r.event_id, r.created_at
+      )
+      SELECT MAX(fr.name) AS name, COUNT(*)::int AS count
+      FROM first_responders fr
+      GROUP BY LOWER(fr.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Streaks (raw rows; computed below)
+    sql`
+      SELECT r.event_id, r.name, e.date
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      WHERE r.status = 'in' AND r.no_show IS NOT TRUE
+      ORDER BY e.date DESC
+    `,
+    // Speed demon: in within 5 minutes of go-live
+    sql`
+      SELECT MAX(r.name) AS name, COUNT(*)::int AS count
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      WHERE r.status = 'in'
+        AND r.created_at <= COALESCE(e.go_live_at, e.created_at) + INTERVAL '5 minutes'
+      GROUP BY LOWER(r.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Fashionably late
+    sql`
+      WITH last_responders AS (
+        SELECT DISTINCT ON (r.event_id) r.name
+        FROM responses r
+        JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+        WHERE r.status = 'in'
+        ORDER BY r.event_id, r.created_at DESC
+      )
+      SELECT MAX(lr.name) AS name, COUNT(*)::int AS count
+      FROM last_responders lr
+      GROUP BY LOWER(lr.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Trendsetter: first vote for what became the chosen venue
+    sql`
+      WITH first_voters AS (
+        SELECT DISTINCT ON (e.id) r.name
+        FROM events e
+        JOIN responses r ON r.event_id = e.id
+        JOIN location_votes lv ON lv.response_id = r.id AND lv.location_id = e.chosen_location_id
+        WHERE e.status = 'finalized'
+          AND e.chosen_location_id IS NOT NULL
+          AND e.group_id = ${groupId}
+        ORDER BY e.id, lv.created_at ASC
+      )
+      SELECT MAX(fv.name) AS name, COUNT(*)::int AS count
+      FROM first_voters fv
+      GROUP BY LOWER(fv.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Cone of shame: said in, didn't show
+    sql`
+      SELECT MAX(r.name) AS name, COUNT(*)::int AS count
+      FROM responses r
+      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      WHERE r.status = 'in' AND r.no_show = TRUE
+      GROUP BY LOWER(r.name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+    // Flip flopper: counts actual in/out/maybe changes (each history row compared with
+    // the one before it), not every saved edit.
+    sql`
+      WITH ordered AS (
+        SELECT rh.name, rh.status,
+               LAG(rh.status) OVER (PARTITION BY rh.response_id ORDER BY rh.changed_at) AS prev_status
+        FROM response_history rh
+        JOIN events e ON e.id = rh.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
+      )
+      SELECT MAX(name) AS name, COUNT(*)::int AS count
+      FROM ordered
+      WHERE prev_status IS NOT NULL AND status <> prev_status
+      GROUP BY LOWER(name)
+      ORDER BY count DESC, name
+      LIMIT 10
+    `,
+  ]);
+
+  return {
+    totalEvents: (countRows[0]?.count as number) ?? 0,
+    attendance: mapEntries(attendance),
+    tastemaker: mapEntries(tastemaker),
+    firstResponder: mapEntries(firstResponder),
+    streaks: computeStreaks(streakRows),
+    speedDemon: mapEntries(speedDemon),
+    fashionablyLate: mapEntries(fashionablyLate),
+    trendsetter: mapEntries(trendsetter),
+    coneOfShame: mapEntries(coneOfShame),
+    flipFlopper: mapEntries(flipFlopper),
+  };
 }
 
-export async function getLeaderboardStreaks(groupId: string) {
-  const sql = getDb();
-  const rows = await sql`
-    SELECT r.event_id, r.name, e.date
-    FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in' AND r.no_show IS NOT TRUE
-    ORDER BY e.date DESC
-  `;
+/** Current consecutive-attendance streak per person, from rows ordered newest event first. */
+function computeStreaks(rows: Record<string, unknown>[]): LeaderboardEntry[] {
   if (rows.length === 0) return [];
 
   const eventOrder: string[] = [];
@@ -668,100 +866,17 @@ export async function getLeaderboardStreaks(groupId: string) {
   }));
 }
 
-export async function getLeaderboardSpeedDemon(groupId: string) {
-  const sql = getDb();
-  return sql`
-    SELECT MAX(r.name) AS name,
-           COUNT(*)::int AS count
-    FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in'
-      AND r.created_at <= COALESCE(e.go_live_at, e.created_at) + INTERVAL '5 minutes'
-    GROUP BY LOWER(r.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardFashionablyLate(groupId: string) {
-  const sql = getDb();
-  return sql`
-    WITH last_responders AS (
-      SELECT DISTINCT ON (r.event_id)
-             r.name
-      FROM responses r
-      JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-      WHERE r.status = 'in'
-      ORDER BY r.event_id, r.created_at DESC
-    )
-    SELECT MAX(lr.name) AS name,
-           COUNT(*)::int AS count
-    FROM last_responders lr
-    GROUP BY LOWER(lr.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardConeOfShame(groupId: string) {
-  const sql = getDb();
-  return sql`
-    SELECT MAX(r.name) AS name,
-           COUNT(*)::int AS count
-    FROM responses r
-    JOIN events e ON e.id = r.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-    WHERE r.status = 'in' AND r.no_show = TRUE
-    GROUP BY LOWER(r.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardTrendsetter(groupId: string) {
-  const sql = getDb();
-  return sql`
-    WITH first_voters AS (
-      SELECT DISTINCT ON (e.id)
-             r.name
-      FROM events e
-      JOIN responses r ON r.event_id = e.id
-      JOIN location_votes lv ON lv.response_id = r.id AND lv.location_id = e.chosen_location_id
-      WHERE e.status = 'finalized'
-        AND e.chosen_location_id IS NOT NULL
-        AND e.group_id = ${groupId}
-      ORDER BY e.id, lv.created_at ASC
-    )
-    SELECT MAX(fv.name) AS name,
-           COUNT(*)::int AS count
-    FROM first_voters fv
-    GROUP BY LOWER(fv.name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
-export async function getLeaderboardFlipFlopper(groupId: string) {
-  const sql = getDb();
-  return sql`
-    WITH changes_per_event AS (
-      SELECT rh.name,
-             rh.event_id,
-             COUNT(*)::int - 1 AS flips
-      FROM response_history rh
-      JOIN events e ON e.id = rh.event_id AND e.status = 'finalized' AND e.group_id = ${groupId}
-      GROUP BY rh.event_id, rh.participant_key, rh.name
-      HAVING COUNT(*) > 1
-    )
-    SELECT MAX(name) AS name,
-           SUM(flips)::int AS count
-    FROM changes_per_event
-    GROUP BY LOWER(name)
-    ORDER BY count DESC, name
-    LIMIT 10
-  `;
-}
-
 // ── Response history queries ──────────────────────────────────
+
+/** Housekeeping: history for cancelled events is never shown anywhere. */
+export async function pruneResponseHistory(): Promise<void> {
+  const sql = getDb();
+  await sql`
+    DELETE FROM response_history rh
+    USING events e
+    WHERE e.id = rh.event_id AND e.status = 'cancelled'
+  `;
+}
 
 export async function getResponseHistory(eventId: string, name: string) {
   const sql = getDb();

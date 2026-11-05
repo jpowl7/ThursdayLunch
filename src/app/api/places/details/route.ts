@@ -6,8 +6,9 @@ export async function GET(request: NextRequest) {
   if (!placeId) {
     return NextResponse.json({ error: "placeId required" }, { status: 400 });
   }
+  const sessionToken = request.nextUrl.searchParams.get("sessionToken");
 
-  const location = await getPlaceLocation(placeId);
+  const location = await getPlaceLocation(placeId, sessionToken);
   if (!location) {
     return NextResponse.json({ error: "Could not resolve location" }, { status: 404 });
   }

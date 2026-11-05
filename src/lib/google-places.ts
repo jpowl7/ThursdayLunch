@@ -31,10 +31,25 @@ export interface PlaceSuggestion {
   secondaryText: string;
 }
 
+/**
+ * Google bills autocomplete per keystroke unless the keystrokes and the final details
+ * lookup share a session token, in which case the whole thing is one "session" charge.
+ * The browser makes the token (see PlacesAutocomplete) and sends it with each request.
+ */
+const SESSION_TOKEN_RE = /^[A-Za-z0-9-]{8,64}$/;
+export function isSessionToken(value: unknown): value is string {
+  return typeof value === "string" && SESSION_TOKEN_RE.test(value);
+}
+
+function withSessionToken(url: string, sessionToken?: string | null): string {
+  return isSessionToken(sessionToken) ? `${url}?sessionToken=${encodeURIComponent(sessionToken)}` : url;
+}
+
 export async function autocompletePlaces(
   input: string,
   locationOverride?: { lat: number; lng: number } | null,
-  types?: string | null
+  types?: string | null,
+  sessionToken?: string | null
 ): Promise<PlaceSuggestion[]> {
   if (!API_KEY || input.length < 2) return [];
 
@@ -54,6 +69,7 @@ export async function autocompletePlaces(
           input,
           locationBias: buildLocationBias(locationOverride),
           includedPrimaryTypes,
+          ...(isSessionToken(sessionToken) ? { sessionToken } : {}),
         }),
       }
     );
@@ -79,13 +95,14 @@ export async function autocompletePlaces(
 }
 
 export async function getPlaceDetails(
-  placeId: string
+  placeId: string,
+  sessionToken?: string | null
 ): Promise<{ address: string; mapsUrl: string; websiteUrl: string | null } | null> {
   if (!API_KEY) return null;
 
   try {
     const res = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}`,
+      withSessionToken(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, sessionToken),
       {
         headers: {
           "X-Goog-Api-Key": API_KEY,
@@ -108,13 +125,14 @@ export async function getPlaceDetails(
 }
 
 export async function getPlaceLocation(
-  placeId: string
+  placeId: string,
+  sessionToken?: string | null
 ): Promise<{ lat: number; lng: number } | null> {
   if (!API_KEY) return null;
 
   try {
     const res = await fetch(
-      `https://places.googleapis.com/v1/places/${placeId}`,
+      withSessionToken(`https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}`, sessionToken),
       {
         headers: {
           "X-Goog-Api-Key": API_KEY,

@@ -59,6 +59,7 @@ export function LocationVoting({
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [placeSessionToken, setPlaceSessionToken] = useState<string | undefined>(undefined);
   const [showAll, setShowAll] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const [pastLocations, setPastLocations] = useState<PastLocation[]>([]);
@@ -136,9 +137,10 @@ export function LocationVoting({
     return bScore - aScore;
   });
 
-  const handlePlaceChange = (name: string, placeId: string | null) => {
+  const handlePlaceChange = (name: string, placeId: string | null, sessionToken?: string) => {
     setNewName(name);
     setSelectedPlaceId(placeId);
+    setPlaceSessionToken(placeId ? sessionToken : undefined);
   };
 
   const handleAddLocation = async () => {
@@ -152,6 +154,7 @@ export function LocationVoting({
         body: JSON.stringify({
           name: trimmed,
           placeId: selectedPlaceId || undefined,
+          sessionToken: selectedPlaceId ? placeSessionToken : undefined,
           addedBy: participantKey || undefined,
         }),
       });
@@ -159,6 +162,7 @@ export function LocationVoting({
         const added = await res.json();
         setNewName("");
         setSelectedPlaceId(null);
+        setPlaceSessionToken(undefined);
         if (added?.id) {
           setRecentlyAdded((prev) => new Set(prev).add(added.id));
           setTimeout(() => {
@@ -190,8 +194,13 @@ export function LocationVoting({
       const res = await fetch(`/api/events/${eventId}/locations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // The chip already knows the address and links from last time, so the server
+        // doesn't need to ask Google again.
         body: JSON.stringify({
           name: pl.name,
+          address: pl.address || undefined,
+          mapsUrl: pl.mapsUrl || undefined,
+          websiteUrl: pl.websiteUrl || undefined,
           addedBy: participantKey || undefined,
         }),
       });

@@ -1,19 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
+// Inter is the only text font the UI uses (Geist / Geist Mono were loaded but never rendered).
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
@@ -45,14 +36,17 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Icon font. Only FILL varies (globals.css pins wght 400), so don't ship the 100–700 weight axis. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:FILL@0..1&display=swap"
           rel="stylesheet"
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} antialiased`}
+        className={`${inter.variable} antialiased`}
       >
         <PullToRefresh>{children}</PullToRefresh>
         <Toaster position="top-center" duration={3000} closeButton />

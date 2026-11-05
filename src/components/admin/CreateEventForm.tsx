@@ -13,6 +13,7 @@ interface CreateEventFormProps {
 interface LocationInput {
   name: string;
   placeId: string | null;
+  sessionToken?: string;
 }
 
 export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventFormProps) {
@@ -38,9 +39,9 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
     setLocations(locations.filter((_, i) => i !== index));
   };
 
-  const updateLocation = (index: number, name: string, placeId: string | null) => {
+  const updateLocation = (index: number, name: string, placeId: string | null, sessionToken?: string) => {
     const updated = [...locations];
-    updated[index] = { name, placeId };
+    updated[index] = { name, placeId, sessionToken: placeId ? sessionToken : undefined };
     setLocations(updated);
   };
 
@@ -71,6 +72,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
           locations: validLocations.map((l) => ({
             name: l.name.trim(),
             placeId: l.placeId || undefined,
+            sessionToken: l.placeId ? l.sessionToken : undefined,
           })),
         }),
       });
@@ -243,7 +245,7 @@ export function CreateEventForm({ token, onCreated, groupSlug }: CreateEventForm
               </div>
               <PlacesAutocomplete
                 value={loc.name}
-                onChange={(name, placeId) => updateLocation(i, name, placeId)}
+                onChange={(name, placeId, sessionToken) => updateLocation(i, name, placeId, sessionToken)}
                 placeholder="Search for a restaurant…"
                 inputClassName={inputClass}
                 groupSlug={groupSlug}

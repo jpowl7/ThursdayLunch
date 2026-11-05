@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
-import { upsertResponse, getEventById, getGroupByEventId, hasConflictingResponse } from "@/lib/db/queries";
+import { upsertResponse, getEventForResponse, getGroupByEventId } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 
 export async function PUT(
@@ -10,13 +10,6 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
-    const event = await getEventById(id);
-    if (!event) {
-      return NextResponse.json({ error: "Event not found" }, { status: 404 });
-    }
-    if (event.status !== "open") {
-      return NextResponse.json({ error: "Event is not open" }, { status: 400 });
-    }
 
     const body = await request.json();
     const parsed = UpsertResponseSchema.safeParse(body);
@@ -26,9 +19,15 @@ export async function PUT(
 
     const { participantKey, ...input } = parsed.data;
 
-    // Server-side duplicate name guard
-    const conflict = await hasConflictingResponse(id, participantKey, input.name);
-    if (conflict) {
+    // Existence, open-ness and the duplicate-name guard in one query.
+    const event = await getEventForResponse(id, participantKey, input.name);
+    if (!event) {
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
+    }
+    if (event.status !== "open") {
+      return NextResponse.json({ error: "Event is not open" }, { status: 400 });
+    }
+    if (event.nameConflict) {
       return NextResponse.json(
         { error: "This name is already in use for this event by another participant" },
         { status: 409 }

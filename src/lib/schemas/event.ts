@@ -14,12 +14,17 @@ export const LocationSchema = z.object({
 
 const DateString = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD");
 const TimeString = z.string().regex(/^\d{2}:\d{2}$/, "Time must be HH:MM");
+/** Only web links — a plain .url() would also accept javascript: or data: URLs. */
+const HttpUrl = z.string().url().max(500).refine((u) => /^https?:\/\//i.test(u), "Must be an http(s) link");
+/** Google Places autocomplete session token, minted by the browser (see PlacesAutocomplete). */
+const SessionToken = z.string().regex(/^[A-Za-z0-9-]{8,64}$/).optional();
 
 export const CreateLocationInput = z.object({
   name: z.string().trim().min(1).max(100),
   address: z.string().max(300).optional(),
-  mapsUrl: z.string().url().max(500).optional(),
+  mapsUrl: HttpUrl.optional(),
   placeId: z.string().max(300).optional(),
+  sessionToken: SessionToken,
 });
 
 export const EventSchema = z.object({
@@ -56,6 +61,11 @@ export const MAX_LOCATIONS_PER_EVENT = 30;
 export const AddLocationSchema = z.object({
   name: z.string().trim().min(1).max(100),
   placeId: z.string().max(300).optional(),
+  sessionToken: SessionToken,
+  /** Known details (from a "past location" chip) so the server can skip the Google lookup. */
+  address: z.string().max(300).optional(),
+  mapsUrl: HttpUrl.optional(),
+  websiteUrl: HttpUrl.optional(),
   /** The adder's raw participant key; required so only real participants can add. */
   addedBy: z.string().min(1).max(100),
 });

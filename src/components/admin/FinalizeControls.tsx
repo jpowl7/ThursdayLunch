@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { EASTERN_TZ, easternToUtc } from "@/lib/eastern-time";
 import type { EventSnapshot } from "@/types";
 
 interface FinalizeControlsProps {
@@ -85,7 +86,7 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
   // Voting deadline state
   const existingDeadline = event.votingDeadline ? new Date(event.votingDeadline) : null;
   const existingDeadlineTime = existingDeadline
-    ? existingDeadline.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "America/Indiana/Indianapolis" })
+    ? existingDeadline.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: EASTERN_TZ })
     : "";
   const [deadlineTime, setDeadlineTime] = useState(existingDeadlineTime);
   const [savingDeadline, setSavingDeadline] = useState(false);
@@ -93,14 +94,9 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
   const handleSetDeadline = async () => {
     setSavingDeadline(true);
     try {
-      // Convert time to full ISO timestamp using event date + Eastern timezone
-      let votingDeadline: string | null = null;
-      if (deadlineTime) {
-        const utcGuess = new Date(`${event.date}T${deadlineTime}:00Z`);
-        const inEastern = new Date(utcGuess.toLocaleString("en-US", { timeZone: "America/Indiana/Indianapolis" }));
-        const offsetMs = inEastern.getTime() - utcGuess.getTime();
-        votingDeadline = new Date(utcGuess.getTime() - offsetMs).toISOString();
-      }
+      // The picker gives an Eastern wall-clock time on the event date; store the UTC instant.
+      // (The old browser-side math was off by the viewer's UTC offset — 5h early in Eastern.)
+      const votingDeadline = deadlineTime ? easternToUtc(event.date, deadlineTime) : null;
 
       const res = await fetch(`/api/events/${event.id}/deadline`, {
         method: "PATCH",
@@ -237,7 +233,7 @@ export function FinalizeControls({ snapshot, token, onFinalized, groupSlug }: Fi
           <div className="flex items-center gap-2">
             <div className="flex-1 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
               <span className="font-medium">Voting closes at </span>
-              {existingDeadline.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: "America/Indiana/Indianapolis" })}
+              {existingDeadline.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: EASTERN_TZ })}
             </div>
             <button
               onClick={handleClearDeadline}

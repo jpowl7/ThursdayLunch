@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllGroupIds, claimGoLiveNotifications, pruneAuthAttempts } from "@/lib/db/queries";
+import { getAllGroupIds, claimGoLiveNotifications, pruneAuthAttempts, pruneResponseHistory } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
 import { processAutoFinalizeAll } from "@/lib/auto-finalize";
 import { processRecurringSchedules } from "@/lib/recurring-events";
@@ -22,7 +22,9 @@ export async function GET(request: Request) {
   }
   if (plan === "create-only") {
     const recurringCount = await processRecurringSchedules();
-    await pruneAuthAttempts(); // once-a-day housekeeping for the lockout table
+    // Once-a-day housekeeping: expired lockout rows, history of cancelled events.
+    await pruneAuthAttempts();
+    await pruneResponseHistory();
     return NextResponse.json({ ok: true, plan, recurringCount });
   }
 
