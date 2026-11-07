@@ -3,6 +3,7 @@ import { checkGroupAdmin } from "@/lib/auth";
 import { after } from "next/server";
 import { CreateEventSchema } from "@/lib/schemas";
 import { createEvent, getGroupBySlug } from "@/lib/db/queries";
+import { invalidatePendingInstants } from "@/lib/cron-pending";
 import { getPlaceDetails } from "@/lib/google-places";
 import { sendPushToGroup } from "@/lib/push";
 import { notifyOwner } from "@/lib/owner-email";
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest) {
     }
 
     const snapshot = await createEvent({ ...eventInput, goLiveAt, delayStartAt, delayEndAt, votingDeadline }, resolvedLocations, group.id);
+    // Any go-live time / deadline on this event must reach the cron's cached pending list.
+    if (goLiveAt || votingDeadline) invalidatePendingInstants();
 
     after(() =>
       notifyOwner(
@@ -89,7 +92,7 @@ export async function POST(request: NextRequest) {
     if (!goLiveAt) {
       after(async () => {
         await sendPushToGroup(group.id, {
-          title: "Thursday lunch is on!",
+          title: "Lunch is on!",
           body: "Vote now.",
           url: `/g/${groupSlug}`,
           tag: `event-${snapshot?.event?.id}`,

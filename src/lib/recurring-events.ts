@@ -7,6 +7,7 @@ import {
 import { sendPushToGroup } from "./push";
 import { notifyOwner } from "./owner-email";
 import { EASTERN_TZ as TZ, easternToUtc, easternToday } from "./eastern-time";
+import { invalidatePendingInstants } from "./cron-pending";
 
 /**
  * Get the next occurrence of a given day_of_week (0=Sun, 4=Thu)
@@ -100,6 +101,8 @@ export async function processRecurringSchedules(): Promise<number> {
       );
 
       await updateRecurringScheduleLastCreated(schedule.groupId, nextEventDate);
+      // The new event's go-live time / deadline must reach the cron's cached pending list.
+      invalidatePendingInstants();
 
       await notifyOwner(
         `[ilikelunch] Recurring meal auto-created: ${schedule.groupSlug}`,

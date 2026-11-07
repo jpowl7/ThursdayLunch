@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkGroupAdmin } from "@/lib/auth";
 import { cancelEvent, getEventById, getGroupByEventId } from "@/lib/db/queries";
+import { invalidatePendingInstants } from "@/lib/cron-pending";
 
 export async function POST(
   request: NextRequest,
@@ -22,6 +23,7 @@ export async function POST(
     }
 
     const updated = await cancelEvent(id);
+    invalidatePendingInstants();
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error cancelling event:", error);

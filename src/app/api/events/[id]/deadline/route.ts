@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkGroupAdmin } from "@/lib/auth";
 import { z } from "zod";
 import { getEventById, getGroupByEventId, updateVotingDeadline } from "@/lib/db/queries";
+import { invalidatePendingInstants } from "@/lib/cron-pending";
 
 const UpdateDeadlineSchema = z.object({
   votingDeadline: z.string().nullable(),
@@ -33,6 +34,7 @@ export async function PATCH(
     }
 
     const updated = await updateVotingDeadline(id, parsed.data.votingDeadline);
+    invalidatePendingInstants();
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error updating voting deadline:", error);

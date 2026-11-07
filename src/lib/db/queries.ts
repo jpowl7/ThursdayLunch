@@ -229,6 +229,31 @@ export async function claimAutoFinalize(groupId: string) {
   return rows[0] || null;
 }
 
+/**
+ * Every upcoming instant at which the cron has work to do: go-live pushes not yet sent and
+ * voting deadlines not yet claimed, on open events, across all groups. Recently-passed
+ * instants (last hour) are included so a tick that missed one still catches it.
+ * Returned as ISO strings so the result can live in Next's data cache.
+ */
+export async function getPendingCronInstants(): Promise<string[]> {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT go_live_at, voting_deadline, notifications_sent, auto_finalize_claimed
+    FROM events
+    WHERE status = 'open'
+      AND (
+        (go_live_at IS NOT NULL AND notifications_sent = FALSE AND go_live_at > NOW() - INTERVAL '1 hour')
+        OR (voting_deadline IS NOT NULL AND auto_finalize_claimed = FALSE AND voting_deadline > NOW() - INTERVAL '1 hour')
+      )
+  `;
+  const instants: string[] = [];
+  for (const row of rows) {
+    if (row.go_live_at && !row.notifications_sent) instants.push(new Date(row.go_live_at as string).toISOString());
+    if (row.voting_deadline && !row.auto_finalize_claimed) instants.push(new Date(row.voting_deadline as string).toISOString());
+  }
+  return instants.sort();
+}
+
 export async function updateVotingDeadline(eventId: string, votingDeadline: string | null) {
   const sql = getDb();
   const rows = await sql`

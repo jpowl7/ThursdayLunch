@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { finalizeEvent, reopenEvent, getEventById, getGroupByEventId, getEventSnapshot } from "@/lib/db/queries";
 import { sendPushToGroup } from "@/lib/push";
+import { invalidatePendingInstants } from "@/lib/cron-pending";
 
 const FinalizeSchema = z.object({
   chosenTime: z.string(),
@@ -39,6 +40,7 @@ export async function PATCH(
     if (!updated) {
       return NextResponse.json({ error: "Chosen location does not belong to this event" }, { status: 400 });
     }
+    invalidatePendingInstants();
 
     after(async () => {
       const snapshot = await getEventSnapshot(id);
@@ -78,6 +80,7 @@ export async function DELETE(
     }
 
     const updated = await reopenEvent(id);
+    invalidatePendingInstants();
     return NextResponse.json(updated);
   } catch (error) {
     console.error("Error reopening event:", error);
