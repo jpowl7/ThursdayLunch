@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { checkGroupAdmin } from "@/lib/auth";
 import { after } from "next/server";
 import { CreateEventSchema } from "@/lib/schemas";
@@ -11,7 +12,7 @@ import { EASTERN_TZ, easternToUtc, easternToday } from "@/lib/eastern-time";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = CreateEventSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });

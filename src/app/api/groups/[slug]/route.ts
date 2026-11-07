@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { z } from "zod";
 import { getGroupBySlug, updateGroupPasscode } from "@/lib/db/queries";
 import { hashCredential } from "@/lib/credentials";
@@ -34,7 +35,7 @@ export async function POST(
 ) {
   try {
     const { slug } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const passcode = typeof body.passcode === "string" ? body.passcode.slice(0, 20) : "";
     const group = await getGroupBySlug(slug);
     if (!group) {
@@ -68,7 +69,7 @@ export async function PATCH(
     const denied = await checkGroupAdmin(request, group);
     if (denied) return denied;
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = ChangePasscodeSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || parsed.error.message }, { status: 400 });

@@ -194,6 +194,17 @@ export async function getCurrentEvent(groupId: string) {
   return rows[0] || null;
 }
 
+/** An open event on or after today, if the group has one (title + date, for messages). */
+export async function getOpenUpcomingEvent(groupId: string) {
+  const sql = getDb();
+  const rows = await sql`
+    SELECT id, title, date::text AS date FROM events
+    WHERE status = 'open' AND group_id = ${groupId} AND date >= CURRENT_DATE
+    ORDER BY date ASC LIMIT 1
+  `;
+  return rows[0] ? { id: rows[0].id as string, title: rows[0].title as string, date: rows[0].date as string } : null;
+}
+
 export async function getScheduledEvent(groupId: string) {
   const sql = getDb();
   const rows = await sql`

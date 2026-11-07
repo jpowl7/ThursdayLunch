@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { AddLocationSchema, MAX_LOCATIONS_PER_EVENT } from "@/lib/schemas";
 import { addLocation, getEventById, getEventSnapshot, getGroupByEventId, isKnownParticipant } from "@/lib/db/queries";
 import { getPlaceDetails, lookupPlace } from "@/lib/google-places";
@@ -17,7 +18,7 @@ export async function POST(
       return NextResponse.json({ error: "Event is not open" }, { status: 400 });
     }
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = AddLocationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });

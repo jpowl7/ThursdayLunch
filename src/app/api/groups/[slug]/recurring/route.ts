@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { getGroupBySlug, getRecurringSchedule, upsertRecurringSchedule, deleteRecurringSchedule } from "@/lib/db/queries";
 import { UpsertRecurringScheduleSchema } from "@/lib/schemas";
 import { checkGroupAdmin } from "@/lib/auth";
@@ -44,7 +45,7 @@ export async function PUT(
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = UpsertRecurringScheduleSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(

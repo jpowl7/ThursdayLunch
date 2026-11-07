@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { after } from "next/server";
 import { z } from "zod";
 import { createGroup, getGroupBySlug, listGroups } from "@/lib/db/queries";
@@ -23,7 +24,7 @@ const CreateGroupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = CreateGroupSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || parsed.error.message }, { status: 400 });

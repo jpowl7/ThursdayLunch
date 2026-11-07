@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { after } from "next/server";
 import { UpsertResponseSchema } from "@/lib/schemas";
 import { upsertResponse, getEventForResponse, getGroupByEventId } from "@/lib/db/queries";
@@ -11,7 +12,7 @@ export async function PUT(
   try {
     const { id } = await params;
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = UpsertResponseSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });

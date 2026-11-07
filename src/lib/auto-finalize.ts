@@ -1,5 +1,6 @@
 import { claimAutoFinalize, getEventSnapshot, finalizeEvent, getAllGroupIds } from "./db/queries";
 import { sendPushToGroup } from "./push";
+import { notifyOwner } from "./owner-email";
 
 /**
  * Calculate the best venue and time from an event snapshot.
@@ -88,7 +89,25 @@ export async function processAutoFinalizeForGroup(groupId: string, groupSlug: st
 
   const defaults = calculateAutoFinalizeDefaults(snapshot);
   if (!defaults) {
-    // Can't calculate — leave event open for admin to handle
+    // Can't pick a venue (no restaurants, nobody "in", or everything vetoed). The event
+    // stays open, but say so loudly: the group gets a push and the owner gets an email,
+    // so an admin finalizes by hand instead of everyone waiting on a decision that never comes.
+    const reason =
+      snapshot.locations.length === 0
+        ? "no restaurants were suggested"
+        : snapshot.responses.filter((r) => r.status === "in").length === 0
+          ? "nobody is in"
+          : "every restaurant was vetoed";
+    await sendPushToGroup(groupId, {
+      title: "Voting closed, no decision",
+      body: `Couldn't pick a restaurant automatically: ${reason}. An admin needs to finalize by hand.`,
+      url: `/g/${groupSlug}/admin`,
+      tag: `auto-finalize-failed-${eventId}`,
+    });
+    await notifyOwner(
+      `[ilikelunch] Auto-finalize could not pick a venue: ${groupSlug}`,
+      `The voting deadline passed but no venue could be chosen (${reason}).\n\nGroup: ${groupSlug}\nEvent: ${snapshot.event.title}\nThe event is still open; an admin must finalize or cancel it.\nAdmin: https://ilikelunch.com/g/${groupSlug}/admin`
+    );
     return false;
   }
 

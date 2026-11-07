@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { updateGroupLocation, getGroupBySlug } from "@/lib/db/queries";
 import { checkGroupAdmin } from "@/lib/auth";
 import { z } from "zod";
@@ -23,7 +24,7 @@ export async function PATCH(
   const denied = await checkGroupAdmin(request, group);
   if (denied) return denied;
 
-  const body = await request.json();
+  const body = await readJsonBody(request);
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid location data" }, { status: 400 });

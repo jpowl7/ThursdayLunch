@@ -1,6 +1,7 @@
 import {
   getActiveRecurringSchedules,
   eventExistsForDate,
+  getOpenUpcomingEvent,
   createEvent,
   updateRecurringScheduleLastCreated,
 } from "./db/queries";
@@ -55,6 +56,18 @@ export async function processRecurringSchedules(): Promise<number> {
       const exists = await eventExistsForDate(schedule.groupId, nextEventDate);
       if (exists) {
         await updateRecurringScheduleLastCreated(schedule.groupId, nextEventDate);
+        continue;
+      }
+
+      // An admin already set up a different upcoming event by hand (createEvent would
+      // silently cancel it). Treat theirs as this week's meal: skip, and tell the owner.
+      const manual = await getOpenUpcomingEvent(schedule.groupId);
+      if (manual) {
+        await updateRecurringScheduleLastCreated(schedule.groupId, nextEventDate);
+        await notifyOwner(
+          `[ilikelunch] Recurring meal skipped: ${schedule.groupSlug}`,
+          `The weekly meal for ${nextEventDate} was NOT auto-created because the group already has an open event.\n\nGroup: ${schedule.groupSlug}\nExisting event: ${manual.title} (${manual.date})\nURL: https://ilikelunch.com/g/${schedule.groupSlug}`
+        );
         continue;
       }
 

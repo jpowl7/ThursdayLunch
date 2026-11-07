@@ -3,7 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { EventSnapshot } from "@/types";
 
+// While voting is open, changes arrive constantly (RSVPs, votes, new restaurants).
 const POLL_INTERVAL = 30000;
+// Once finalized the only thing that can change is an admin reopening it, so a visible
+// tab checks much less often. Hidden tabs never poll, whatever the state.
+const FINALIZED_POLL_INTERVAL = 5 * 60 * 1000;
 
 type ConnectionState = "polling" | "disconnected";
 
@@ -27,11 +31,11 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
   // `immediate` fetches right away (tab came back into view, data is stale). On first
   // start the caller has just loaded the snapshot itself, so we only schedule the timer
   // instead of fetching the same thing a second time.
-  const startPolling = useCallback((immediate: boolean) => {
+  const startPolling = useCallback((immediate: boolean, intervalMs: number) => {
     if (pollingRef.current) return;
     setConnectionState("polling");
     if (immediate) fetchSnapshot();
-    pollingRef.current = setInterval(fetchSnapshot, POLL_INTERVAL);
+    pollingRef.current = setInterval(fetchSnapshot, intervalMs);
   }, [fetchSnapshot]);
 
   const stopPolling = useCallback(() => {
@@ -44,22 +48,21 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
 
   const eventStatus = snapshot?.event?.status ?? null;
   const isFinalized = eventStatus !== null && eventStatus !== "open";
+  const intervalMs = isFinalized ? FINALIZED_POLL_INTERVAL : POLL_INTERVAL;
 
   useEffect(() => {
     if (!eventId) return;
 
     const handleVisibility = () => {
-      if (document.hidden || isFinalized) {
+      if (document.hidden) {
         stopPolling();
       } else {
-        startPolling(true);
+        startPolling(true, intervalMs);
       }
     };
 
-    if (!document.hidden && !isFinalized) {
-      startPolling(false);
-    } else if (isFinalized) {
-      stopPolling();
+    if (!document.hidden) {
+      startPolling(false, intervalMs);
     }
 
     document.addEventListener("visibilitychange", handleVisibility);
@@ -68,7 +71,7 @@ export function useEventStream(eventId: string | null, groupSlug: string) {
       document.removeEventListener("visibilitychange", handleVisibility);
       stopPolling();
     };
-  }, [eventId, isFinalized, startPolling, stopPolling]);
+  }, [eventId, intervalMs, startPolling, stopPolling]);
 
   const refresh = useCallback(() => {
     fetchSnapshot();

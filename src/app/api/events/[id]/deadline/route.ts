@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { checkGroupAdmin } from "@/lib/auth";
 import { z } from "zod";
 import { getEventById, getGroupByEventId, updateVotingDeadline } from "@/lib/db/queries";
@@ -27,7 +28,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Event not found or not open" }, { status: 404 });
     }
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = UpdateDeadlineSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });

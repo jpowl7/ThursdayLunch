@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/api-body";
 import { checkGroupAdmin } from "@/lib/auth";
 import { DeleteLocationSchema, RenameLocationSchema } from "@/lib/schemas";
 import { deleteLocation, adminDeleteLocation, updateLocationName, getEventById, getGroupByEventId } from "@/lib/db/queries";
@@ -33,7 +34,7 @@ export async function DELETE(
     }
 
     // Participant delete — can only delete own locations
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = DeleteLocationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
@@ -65,7 +66,7 @@ export async function PATCH(
     const denied = await checkGroupAdmin(request, group);
     if (denied) return denied;
 
-    const body = await request.json();
+    const body = await readJsonBody(request);
     const parsed = RenameLocationSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.message }, { status: 400 });
