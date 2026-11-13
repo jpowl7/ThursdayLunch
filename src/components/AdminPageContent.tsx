@@ -44,6 +44,18 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const [newPasscode, setNewPasscode] = useState("");
   const [changingPasscode, setChangingPasscode] = useState(false);
 
+  // "Remember on this device" — the passcode otherwise lives only in memory and has to be
+  // retyped every visit, which is how it gets forgotten in the first place.
+  const rememberKey = `admin-passcode:${groupSlug}`;
+  const [rememberMe, setRememberMe] = useState(false);
+  const [checkingRemembered, setCheckingRemembered] = useState(true);
+
+  // Recovery email state (masked; the real address never reaches the browser)
+  const [recoveryEmail, setRecoveryEmail] = useState<string | null>(null);
+  const [recoveryEmailInput, setRecoveryEmailInput] = useState("");
+  const [editingRecoveryEmail, setEditingRecoveryEmail] = useState(false);
+  const [savingRecoveryEmail, setSavingRecoveryEmail] = useState(false);
+
   // Group location state
   const [groupLocationName, setGroupLocationName] = useState<string | null>(null);
   const [editingLocation, setEditingLocation] = useState(false);
@@ -97,6 +109,79 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       .catch(() => {});
   }, [groupSlug]);
 
+  // Try a passcode remembered on this device. A stale one (changed since) is forgotten.
+  useEffect(() => {
+    let saved: string | null = null;
+    try {
+      saved = localStorage.getItem(rememberKey);
+    } catch {
+      // storage unavailable
+    }
+    if (!saved) {
+      setCheckingRemembered(false);
+      return;
+    }
+    fetch(`/api/groups/${groupSlug}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ passcode: saved }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.valid) {
+          setRememberMe(true);
+          setActivePasscode(saved);
+        } else {
+          try { localStorage.removeItem(rememberKey); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setCheckingRemembered(false));
+  }, [groupSlug, rememberKey]);
+
+  // Load the masked recovery email once signed in (passcode groups only)
+  useEffect(() => {
+    if (!activePasscode || isOpenGroup) return;
+    fetch(`/api/groups/${groupSlug}/admin-email`, { headers: { Authorization: `Bearer ${activePasscode}` } })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setRecoveryEmail(data?.adminEmail ?? null))
+      .catch(() => {});
+  }, [activePasscode, isOpenGroup, groupSlug]);
+
+  const handleSignOut = () => {
+    try { localStorage.removeItem(rememberKey); } catch { /* ignore */ }
+    setRememberMe(false);
+    setActivePasscode(null);
+    setAuthorized(false);
+    setPasscodeInput("");
+    setInitialSnapshot(null);
+    setScheduledSnapshot(null);
+  };
+
+  const handleSaveRecoveryEmail = async (value: string | null) => {
+    setSavingRecoveryEmail(true);
+    try {
+      const res = await fetch(`/api/groups/${groupSlug}/admin-email`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${activePasscode}` },
+        body: JSON.stringify({ adminEmail: value }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRecoveryEmail(data.adminEmail ?? null);
+        setRecoveryEmailInput("");
+        setEditingRecoveryEmail(false);
+        toast.success(value ? "Recovery email saved" : "Recovery email removed");
+      } else {
+        toast.error(data.error || "Failed to save");
+      }
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setSavingRecoveryEmail(false);
+    }
+  };
+
   useEffect(() => {
     if (activePasscode !== null) {
       setAuthorized(true);
@@ -130,6 +215,9 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
       });
       const data = await res.json();
       if (data.valid) {
+        if (rememberMe) {
+          try { localStorage.setItem(rememberKey, trimmed); } catch { /* ignore */ }
+        }
         setActivePasscode(trimmed);
       } else {
         toast.error(data.error || "Wrong passcode");
@@ -199,6 +287,9 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
         body: JSON.stringify({ newPasscode }),
       });
       if (res.ok) {
+        if (rememberMe) {
+          try { localStorage.setItem(rememberKey, newPasscode); } catch { /* ignore */ }
+        }
         setActivePasscode(newPasscode);
         setNewPasscode("");
         toast.success("Passcode updated!");
@@ -216,6 +307,14 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
   const eventId = initialSnapshot?.event?.id || null;
   const { snapshot: liveSnapshot } = useEventStream(eventId, groupSlug);
   const snapshot = liveSnapshot || initialSnapshot;
+
+  if (!authorized && checkingRemembered) {
+    return (
+      <div className="flex items-center justify-center min-h-screen w-full overflow-hidden">
+        <span className="material-symbols-outlined text-orange-300 text-[48px] animate-pulse">lunch_dining</span>
+      </div>
+    );
+  }
 
   if (!authorized) {
     return (
@@ -244,6 +343,15 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               Go
             </button>
           </div>
+          <label className="flex items-center justify-center gap-2 text-sm text-slate-500 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="w-4 h-4 accent-orange-500"
+            />
+            Remember on this device
+          </label>
         </div>
       </div>
     );
@@ -273,6 +381,11 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
           <div className="flex items-center gap-3 shrink-0">
             <Link href="/" className="text-sm text-slate-400 hover:text-orange-500 transition-colors whitespace-nowrap">Home</Link>
             <a href={`/g/${groupSlug}`} className="text-sm text-slate-400 hover:text-orange-500 transition-colors whitespace-nowrap">Group</a>
+            {!isOpenGroup && (
+              <button type="button" onClick={handleSignOut} className="text-sm text-slate-400 hover:text-orange-500 transition-colors whitespace-nowrap">
+                Sign out
+              </button>
+            )}
           </div>
         </header>
 
@@ -542,6 +655,71 @@ export function AdminPageContent({ groupSlug }: AdminPageContentProps) {
               {changingPasscode ? "..." : "Update"}
             </button>
           </div>
+        </div>}
+
+        {/* Recovery Email Section — hidden for open/demo groups */}
+        {!isOpenGroup && <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Recovery Email</h3>
+          <p className="text-xs text-slate-400">
+            If the passcode is forgotten, a reset link goes to this address. It is never shown to the group.
+          </p>
+          {!editingRecoveryEmail ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className={`text-sm truncate ${recoveryEmail ? "text-slate-700" : "text-amber-600"}`}>
+                {recoveryEmail ?? "None on file — add one so you can't get locked out."}
+              </p>
+              <button
+                type="button"
+                onClick={() => setEditingRecoveryEmail(true)}
+                className="shrink-0 px-4 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 transition-colors"
+              >
+                {recoveryEmail ? "Change" : "Add"}
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                maxLength={254}
+                value={recoveryEmailInput}
+                onChange={(e) => setRecoveryEmailInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && recoveryEmailInput.trim() && handleSaveRecoveryEmail(recoveryEmailInput.trim())}
+                placeholder="you@example.com"
+                autoFocus
+                className="w-full px-3 py-2 text-base border border-slate-200 rounded-lg bg-white focus:outline-none focus:border-orange-400 focus:ring-1 focus:ring-orange-400"
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSaveRecoveryEmail(recoveryEmailInput.trim())}
+                  disabled={savingRecoveryEmail || !recoveryEmailInput.trim()}
+                  className="flex-1 px-4 py-2 text-sm font-semibold rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors"
+                >
+                  {savingRecoveryEmail ? "..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setEditingRecoveryEmail(false); setRecoveryEmailInput(""); }}
+                  disabled={savingRecoveryEmail}
+                  className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                {recoveryEmail && (
+                  <button
+                    type="button"
+                    onClick={() => confirm("Remove the recovery email? You won't be able to reset a forgotten passcode.") && handleSaveRecoveryEmail(null)}
+                    disabled={savingRecoveryEmail}
+                    className="px-4 py-2 text-sm font-medium rounded-lg border border-red-200 text-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>}
         </div>
       </main>

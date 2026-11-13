@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/api-body";
 import { after } from "next/server";
-import { z } from "zod";
 import { createGroup, getGroupBySlug, listGroups } from "@/lib/db/queries";
 import { notifyOwner } from "@/lib/owner-email";
+import { sendEmail } from "@/lib/email";
+import { welcomeEmail } from "@/lib/email-templates";
 import { hashCredential } from "@/lib/credentials";
+import { CreateGroupSchema } from "@/lib/schemas/group";
 
 export async function GET() {
   try {
@@ -15,12 +17,6 @@ export async function GET() {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
-const CreateGroupSchema = z.object({
-  slug: z.string().min(1).max(50).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
-  name: z.string().min(1).max(100),
-  passcode: z.string().regex(/^\d{4}$/, "Passcode must be exactly 4 digits"),
-});
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,14 +31,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "A group with that URL already exists" }, { status: 409 });
     }
 
-    const group = await createGroup(parsed.data.slug, parsed.data.name, await hashCredential(parsed.data.passcode));
+    const { slug, name, passcode, adminEmail } = parsed.data;
+    const group = await createGroup(slug, name, await hashCredential(passcode), adminEmail);
 
-    after(() =>
-      notifyOwner(
+    after(async () => {
+      if (adminEmail) {
+        const mail = welcomeEmail(group);
+        await sendEmail(adminEmail, mail.subject, mail.text);
+      }
+      await notifyOwner(
         `[ilikelunch] New group: ${group.name}`,
-        `A new group was just created.\n\nName: ${group.name}\nSlug: ${group.slug}\nURL: https://ilikelunch.com/g/${group.slug}`
-      )
-    );
+        `A new group was just created.\n\nName: ${group.name}\nSlug: ${group.slug}\nRecovery email: ${adminEmail ? "yes" : "none"}\nURL: https://ilikelunch.com/g/${group.slug}`
+      );
+    });
 
     return NextResponse.json({ slug: group.slug, name: group.name }, { status: 201 });
   } catch (error) {

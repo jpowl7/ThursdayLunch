@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readJsonBody } from "@/lib/api-body";
-import { z } from "zod";
+import { after } from "next/server";
 import { getGroupBySlug, updateGroupPasscode } from "@/lib/db/queries";
 import { hashCredential } from "@/lib/credentials";
 import { checkGroupAdmin, verifyGroupPasscodeAttempt, LOCKOUT_MESSAGE } from "@/lib/auth";
+import { ChangePasscodeSchema } from "@/lib/schemas/group";
+import { sendEmail } from "@/lib/email";
+import { passcodeChangedEmail } from "@/lib/email-templates";
 
 export async function GET(
   _request: NextRequest,
@@ -19,6 +22,7 @@ export async function GET(
       slug: group.slug,
       name: group.name,
       requiresPasscode: group.passcode !== "",
+      hasRecoveryEmail: group.adminEmail !== null,
       locationName: group.locationName,
     });
     response.headers.set("Cache-Control", "public, s-maxage=3600, stale-while-revalidate=3600");
@@ -52,10 +56,6 @@ export async function POST(
   }
 }
 
-const ChangePasscodeSchema = z.object({
-  newPasscode: z.string().regex(/^\d{4}$/, "Passcode must be exactly 4 digits"),
-});
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -76,6 +76,13 @@ export async function PATCH(
     }
 
     await updateGroupPasscode(group.id, await hashCredential(parsed.data.newPasscode));
+    if (group.adminEmail) {
+      const to = group.adminEmail;
+      after(async () => {
+        const mail = passcodeChangedEmail(group);
+        await sendEmail(to, mail.subject, mail.text);
+      });
+    }
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error updating group passcode:", error);

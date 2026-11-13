@@ -21,6 +21,7 @@ export default function LandingPage() {
   const [groupSlug, setGroupSlug] = useState("");
   const [slugEdited, setSlugEdited] = useState(false);
   const [passcode, setPasscode] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
   const [createError, setCreateError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [groups, setGroups] = useState<{ slug: string; name: string; eventCount: number }[]>([]);
@@ -70,6 +71,7 @@ export default function LandingPage() {
           slug: groupSlug,
           name: groupName.trim(),
           passcode,
+          adminEmail: adminEmail.trim(),
         }),
       });
       if (res.ok) {
@@ -298,6 +300,24 @@ export default function LandingPage() {
                   />
                   <p className="text-[11px] text-slate-400 mt-1 px-1">
                     Share this with group admins to manage events
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1 px-1">
+                    Recovery Email <span className="font-normal text-slate-400">(optional, recommended)</span>
+                  </label>
+                  <input
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    maxLength={254}
+                    value={adminEmail}
+                    onChange={(e) => setAdminEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className={inputClass}
+                  />
+                  <p className="text-[11px] text-slate-400 mt-1 px-1">
+                    Only used if the passcode is forgotten. Never shown to the group.
                   </p>
                 </div>
 

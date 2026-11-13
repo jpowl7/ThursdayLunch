@@ -12,11 +12,11 @@ export function hashParticipantKey(key: string): string {
 
 // ── Group queries ──────────────────────────────────────────
 
-export async function createGroup(slug: string, name: string, passcode: string) {
+export async function createGroup(slug: string, name: string, passcode: string, adminEmail: string | null = null) {
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO groups (slug, name, passcode)
-    VALUES (${slug}, ${name}, ${passcode})
+    INSERT INTO groups (slug, name, passcode, admin_email)
+    VALUES (${slug}, ${name}, ${passcode}, ${adminEmail})
     RETURNING *
   `;
   return mapGroup(rows[0]);
@@ -24,8 +24,14 @@ export async function createGroup(slug: string, name: string, passcode: string) 
 
 export async function getGroupBySlug(slug: string) {
   const sql = getDb();
-  const rows = await sql`SELECT id, slug, name, passcode, location_lat, location_lng, location_name, created_at FROM groups WHERE slug = ${slug}`;
+  const rows = await sql`SELECT id, slug, name, passcode, admin_email, location_lat, location_lng, location_name, created_at FROM groups WHERE slug = ${slug}`;
   return rows[0] ? mapGroup(rows[0]) : null;
+}
+
+/** Set or clear (null) the passcode-recovery address. Caller passes a normalized email. */
+export async function setGroupAdminEmail(groupId: string, adminEmail: string | null): Promise<void> {
+  const sql = getDb();
+  await sql`UPDATE groups SET admin_email = ${adminEmail} WHERE id = ${groupId}`;
 }
 
 /** `passcodeHash` is the scrypt string from hashCredential(), or "" for an open group. */
@@ -1193,6 +1199,7 @@ function mapGroup(row: Record<string, unknown>) {
     slug: row.slug as string,
     name: row.name as string,
     passcode: row.passcode as string,
+    adminEmail: (row.admin_email as string | null) ?? null,
     locationLat: row.location_lat != null ? Number(row.location_lat) : null,
     locationLng: row.location_lng != null ? Number(row.location_lng) : null,
     locationName: (row.location_name as string) || null,
